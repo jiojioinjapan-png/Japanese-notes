@@ -1,0 +1,803 @@
+/* iPhone first. Safe-area variables can also be overridden in browser tests. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+@media (max-width: 760px), (max-width: 950px) and (hover: none) and (pointer: coarse) {
+  html {
+    scroll-padding-top: calc(72px + var(--safe-top));
+  }
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+  button,
+  a {
+    touch-action: manipulation;
+  }
+  button:active:not(:disabled) {
+    opacity: 0.72;
+  }
+  .sidebar,
+  .topbar {
+    display: none;
+  }
+  .main-shell {
+    margin-left: 0;
+  }
+  .app-shell {
+    padding-bottom: calc(88px + var(--safe-bottom));
+  }
+  .mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: calc(64px + var(--safe-top));
+    padding: calc(8px + var(--safe-top)) max(16px, var(--safe-right)) 8px
+      max(20px, var(--safe-left));
+    background: var(--bg);
+  }
+  .mobile-brand {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    padding: 0;
+    min-height: 44px;
+  }
+  .mobile-brand .brand-icon {
+    width: 34px;
+    height: 36px;
+    border-radius: 9px;
+  }
+  .mobile-brand > span:last-child {
+    font-family: var(--serif);
+    font-size: 19px;
+    letter-spacing: 1px;
+  }
+  .mobile-brand > span:last-child > span {
+    display: block;
+    font-family: -apple-system, sans-serif;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-top: 1px;
+  }
+  .icon-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 50%;
+  }
+  .mobile-header > .icon-button {
+    background: var(--input);
+  }
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    z-index: 6;
+    inset: auto 0 0;
+    justify-content: space-around;
+    align-items: start;
+    min-height: calc(68px + var(--safe-bottom));
+    padding: 7px max(16px, var(--safe-right)) calc(7px + var(--safe-bottom))
+      max(16px, var(--safe-left));
+    background: color-mix(in srgb, var(--bg) 91%, transparent);
+    -webkit-backdrop-filter: blur(22px);
+    backdrop-filter: blur(22px);
+    border-top: 1px solid var(--border);
+  }
+  .mobile-tabbar button {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 52px;
+    max-width: 150px;
+    color: var(--muted);
+    font-size: 11px;
+    border-radius: 12px;
+  }
+  .mobile-tabbar button[aria-current='page'] {
+    color: var(--accent);
+  }
+  .mobile-tabbar button[aria-current='page'] svg {
+    fill: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .main-content {
+    padding: 13px max(20px, var(--safe-right)) 0 max(20px, var(--safe-left));
+    max-width: 700px;
+  }
+  .intro {
+    display: block;
+    margin-bottom: 28px;
+  }
+  .eyebrow,
+  .intro-seal {
+    display: none;
+  }
+  .intro h1,
+  .mobile-search-title h1 {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    line-height: 1.25;
+  }
+  .intro h1 > span {
+    display: none;
+  }
+  .intro-description,
+  .mobile-search-title p {
+    font-size: 14px;
+    line-height: 1.7;
+    letter-spacing: 0;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .section-heading {
+    margin-bottom: 16px;
+  }
+  .section-heading h2 {
+    font-size: 19px;
+    font-weight: 650;
+  }
+  .section-heading h2 span,
+  .section-heading .muted {
+    display: none;
+  }
+  .collections-grid {
+    gap: 17px;
+  }
+  .collection {
+    min-width: 0;
+    border-radius: 6px;
+  }
+  .book-cover {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 0.68;
+    border-radius: 2px 5px 5px 2px;
+  }
+  .book-spine {
+    width: 10px;
+  }
+  .cover-number {
+    top: 15px;
+    left: 15px;
+    font-size: 6px;
+    letter-spacing: 1px;
+  }
+  .cover-letter {
+    left: 18px;
+    top: 44px;
+    font-size: 29px;
+    writing-mode: horizontal-tb;
+    width: 1em;
+    height: 110px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    letter-spacing: 0;
+    line-height: 1.4;
+  }
+  .onomatopoeia .cover-letter {
+    left: 17px;
+    top: 40px;
+    font-size: 24px;
+    letter-spacing: 0;
+  }
+  .cover-english {
+    writing-mode: vertical-rl;
+    top: 34px;
+    left: auto;
+    right: 11px;
+    font-size: 5px;
+    letter-spacing: 1.5px;
+  }
+  .cover-footer {
+    left: 16px;
+    right: 8px;
+    bottom: 12px;
+    font-size: 4px;
+    letter-spacing: 0;
+  }
+  .cover-footer > span {
+    display: none;
+  }
+  .cover-art {
+    width: 160px;
+    height: 160px;
+    right: -57px;
+    bottom: -70px;
+  }
+  .cover-art i:nth-child(2) {
+    inset: 12px;
+  }
+  .cover-art i:nth-child(3) {
+    inset: 24px;
+  }
+  .cover-art i:nth-child(4) {
+    inset: 36px;
+  }
+  .collection-caption {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 13px;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+  .collection-caption svg {
+    display: none;
+  }
+  .collection-count {
+    font-size: 12px;
+    line-height: 1.6;
+    margin-top: 2px;
+  }
+  .notes-section {
+    position: relative;
+    margin-top: 28px;
+    padding-top: 24px;
+    scroll-margin-top: calc(75px + var(--safe-top));
+  }
+  .notes-heading {
+    min-height: 44px;
+    padding-right: 130px;
+    margin-bottom: 12px;
+  }
+  .notes-heading h2 {
+    font-family: -apple-system, sans-serif;
+    font-size: 23px;
+    font-weight: 650;
+    gap: 8px;
+    line-height: 1.4;
+  }
+  .notes-heading p {
+    display: none;
+  }
+  .count-pill {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+  .view-switch {
+    display: none;
+  }
+  .filter-toolbar {
+    position: absolute;
+    top: 24px;
+    right: 0;
+    width: 125px;
+  }
+  .search-box {
+    display: none;
+  }
+  .sort-select {
+    width: 100%;
+  }
+  .sort-select select {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 5px 0 10px;
+    font-size: 16px;
+    background: var(--input);
+    border: none;
+  }
+  .category-tabs {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 0 18px;
+    padding: 2px 0;
+  }
+  .category-tabs button {
+    min-height: 44px;
+    padding: 10px 13px;
+    font-size: 14px;
+    white-space: nowrap;
+    border-radius: 22px;
+    flex-shrink: 0;
+  }
+  .category-tabs button.active {
+    background: var(--accent-soft);
+  }
+  .notes-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .note-card {
+    border-radius: 13px;
+    padding: 20px;
+    min-height: 225px;
+    box-shadow: 0 2px 5px #31271603;
+  }
+  .note-card:hover {
+    transform: none;
+  }
+  .note-card-top {
+    margin-bottom: 14px;
+  }
+  .note-card-top > svg {
+    opacity: 0.65;
+  }
+  .type-badge {
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 5px;
+  }
+  .note-term {
+    font-size: 31px;
+    line-height: 1.55;
+    letter-spacing: 0.5px;
+  }
+  .pronunciation {
+    font-size: 14px;
+    gap: 9px;
+    margin-top: 5px;
+    line-height: 1.8;
+  }
+  .accent {
+    font-size: 12px;
+    min-width: 21px;
+    height: 21px;
+    line-height: 19px;
+    border-radius: 4px;
+  }
+  .part-of-speech {
+    font-size: 12px;
+  }
+  .note-meaning {
+    font-size: 16px;
+    line-height: 1.8;
+    margin-top: 12px;
+  }
+  .note-example {
+    margin-top: 16px;
+    padding-left: 13px;
+  }
+  .example-label {
+    font-size: 11px;
+  }
+  .note-card .note-example p {
+    font-size: 15px;
+    line-height: 1.95;
+    margin-top: 6px;
+  }
+  .note-card-footer {
+    font-size: 11px;
+    padding-top: 13px;
+  }
+  .note-card > p:last-of-type,
+  .note-card > .note-example {
+    margin-bottom: 20px;
+  }
+  .list-view .note-card {
+    display: flex;
+    min-height: 0;
+    gap: 0;
+    padding: 18px 20px;
+  }
+  .list-view .note-card-top {
+    display: flex;
+    margin-bottom: 9px;
+    padding: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .list-view .note-card-top > svg {
+    display: block;
+  }
+  .list-view .note-term {
+    font-size: 26px;
+  }
+  .list-view .note-meaning {
+    margin-top: 8px !important;
+    margin-bottom: 0 !important;
+    font-size: 15px;
+  }
+  .list-view .note-example,
+  .list-view .note-card-footer {
+    display: none;
+  }
+  .pagination {
+    font-size: 12px;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .pagination > div {
+    gap: 3px;
+  }
+  .page-footer {
+    padding: 24px 0;
+    margin-top: 25px;
+    font-size: 11px;
+  }
+  .page-footer > span:nth-child(2) {
+    display: none;
+  }
+  .empty-state {
+    padding: 40px 20px;
+  }
+  .empty-state h3 {
+    font-size: 24px;
+  }
+  .empty-state p {
+    font-size: 15px;
+  }
+  .primary-button,
+  .secondary-button {
+    min-height: 44px;
+    font-size: 16px;
+    padding: 10px 17px;
+    border-radius: 10px;
+  }
+  .text-button {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .mobile-search-mode .intro,
+  .mobile-search-mode .collection-section {
+    display: none;
+  }
+  .mobile-search-mode .mobile-search-title {
+    display: block;
+    margin: 0 0 25px;
+  }
+  .mobile-search-mode .notes-section {
+    border: none;
+    margin-top: 0;
+    padding-top: 0;
+  }
+  .mobile-search-mode .notes-heading {
+    display: none;
+  }
+  .mobile-search-mode .filter-toolbar {
+    position: static;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+  }
+  .mobile-search-mode .search-box {
+    display: flex;
+    flex-basis: 100%;
+    min-height: 50px;
+    padding: 0 13px;
+    border-radius: 12px;
+    gap: 10px;
+  }
+  .mobile-search-mode .search-box input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+  .clear-search {
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    margin-right: -10px;
+  }
+  .mobile-search-mode .sort-select {
+    width: 145px;
+  }
+  .mobile-search-mode .category-tabs {
+    margin-top: 0;
+  }
+  .modal {
+    -webkit-overflow-scrolling: touch;
+  }
+  .reader[open] {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .reader-toolbar {
+    padding: calc(8px + var(--safe-top)) max(16px, var(--safe-right)) 8px
+      max(20px, var(--safe-left));
+    border-bottom: none;
+    background: var(--surface);
+  }
+  .reader-actions {
+    gap: 2px;
+  }
+  .reader-toolbar .text-button {
+    font-size: 15px;
+    color: var(--accent);
+  }
+  .reader-page {
+    min-height: 0;
+    padding: 34px max(28px, var(--safe-right)) 36px max(28px, var(--safe-left));
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .reader-kicker {
+    margin: 38px 0 17px;
+    font-size: 11px;
+  }
+  .reader-page .note-term {
+    font-size: 43px;
+    line-height: 1.65;
+  }
+  .reader-page .pronunciation {
+    font-size: 17px;
+    line-height: 1.8;
+    gap: 10px;
+  }
+  .reader-page .accent {
+    min-width: 24px;
+    height: 24px;
+    line-height: 22px;
+    font-size: 12px;
+  }
+  .reader-page .part-of-speech {
+    font-size: 14px;
+  }
+  .reader-page .note-meaning {
+    font-size: 22px;
+    line-height: 1.9;
+    margin-top: 29px;
+  }
+  .reader-page .note-example {
+    padding-left: 18px;
+    margin-top: 34px;
+  }
+  .reader-page .example-label {
+    font-size: 12px;
+  }
+  .reader-page .note-example p {
+    font-size: 20px;
+    line-height: 2;
+  }
+  .reader-page .example-translation {
+    font-size: 16px !important;
+    line-height: 1.9 !important;
+  }
+  .reader-end {
+    margin-top: 45px;
+  }
+  .reader-footer {
+    min-height: calc(72px + var(--safe-bottom));
+    padding: 10px max(20px, var(--safe-right)) calc(10px + var(--safe-bottom))
+      max(20px, var(--safe-left));
+    gap: 35px;
+    font-size: 13px;
+    background: var(--surface);
+  }
+  .reader-footer .icon-button {
+    background: var(--input);
+  }
+  .large-text .reader-page .note-term {
+    font-size: 51px;
+  }
+  .large-text .reader-page .note-meaning {
+    font-size: 26px;
+  }
+  .large-text .reader-page .note-example p {
+    font-size: 24px;
+  }
+  .import-modal[open] {
+    position: fixed;
+    inset: auto 0 var(--keyboard-inset, 0px);
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: calc(var(--visual-height, 100dvh) - max(12px, var(--safe-top)));
+    border: none;
+    border-radius: 24px 24px 0 0;
+    padding: 24px max(22px, var(--safe-right)) max(22px, var(--safe-bottom))
+      max(22px, var(--safe-left));
+    overflow-y: auto;
+    scroll-padding: 24px;
+  }
+  .modal-header {
+    margin-bottom: 18px;
+  }
+  .import-modal h2 {
+    font-size: 27px;
+    line-height: 1.6;
+  }
+  .modal-description {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .import-tools {
+    align-items: center;
+    margin-top: 22px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+  .import-tools > label span {
+    font-size: 10px;
+  }
+  .import-tools > div {
+    gap: 14px;
+    margin-left: auto;
+  }
+  .import-tools .text-button {
+    font-size: 13px;
+  }
+  .import-modal textarea {
+    font-size: 16px;
+    min-height: 220px;
+    max-height: 40dvh;
+    padding: 14px;
+    line-height: 1.7;
+  }
+  .token-label {
+    font-size: 15px;
+    margin: 22px 0 10px;
+  }
+  .import-modal input[type='password'] {
+    height: 50px;
+    font-size: 16px;
+    border-radius: 10px;
+  }
+  .import-hint {
+    font-size: 12px;
+    line-height: 1.7;
+    align-items: flex-start;
+    gap: 7px;
+  }
+  .import-hint > svg {
+    margin-top: 3px;
+  }
+  .import-preview {
+    padding: 14px;
+  }
+  .import-preview > div:first-child {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .import-preview > p {
+    font-size: 12px;
+    line-height: 1.8;
+  }
+  .preview-terms span {
+    font-size: 13px;
+    padding: 5px 9px;
+  }
+  .validation-error {
+    font-size: 14px;
+    line-height: 1.8;
+    max-height: 180px;
+  }
+  .import-success {
+    font-size: 14px;
+  }
+  .import-footer {
+    gap: 12px;
+    margin-top: 22px;
+    padding-top: 17px;
+    flex-wrap: wrap;
+  }
+  .import-footer > a {
+    font-size: 13px;
+  }
+  .import-footer .primary-button {
+    margin-left: auto;
+  }
+  .toast {
+    bottom: calc(82px + var(--safe-bottom));
+    left: max(16px, var(--safe-left));
+    right: max(16px, var(--safe-right));
+    width: auto;
+    max-width: none;
+    transform: none;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px;
+  }
+  .toast > span {
+    flex: 1;
+  }
+  .toast > button {
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0;
+  }
+  .skeleton {
+    height: 240px;
+  }
+}
+
+@media (max-width: 360px) {
+  .main-content {
+    padding-left: max(16px, var(--safe-left));
+    padding-right: max(16px, var(--safe-right));
+  }
+  .collections-grid {
+    gap: 13px;
+  }
+  .cover-letter {
+    left: 14px;
+    top: 39px;
+    font-size: 25px;
+  }
+  .onomatopoeia .cover-letter {
+    left: 14px;
+    top: 34px;
+    font-size: 21px;
+  }
+  .cover-number {
+    left: 13px;
+    top: 12px;
+    font-size: 5px;
+  }
+  .cover-footer {
+    display: none;
+  }
+  .collection-caption {
+    font-size: 13px;
+  }
+  .category-tabs {
+    gap: 2px;
+  }
+  .category-tabs button {
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 13px;
+  }
+  .notes-heading {
+    padding-right: 125px;
+  }
+  .notes-heading h2 {
+    font-size: 21px;
+  }
+  .reader-page {
+    padding-left: 23px;
+    padding-right: 23px;
+  }
+  .reader-page .note-term {
+    font-size: 37px;
+  }
+  .reader-toolbar .text-button {
+    font-size: 14px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
+  .reader-toolbar {
+    padding-top: max(4px, var(--safe-top));
+    padding-bottom: 4px;
+  }
+  .reader-page {
+    padding-top: 18px;
+  }
+  .reader-footer {
+    min-height: calc(56px + var(--safe-bottom));
+    padding-top: 5px;
+    padding-bottom: calc(5px + var(--safe-bottom));
+  }
+  .reader-kicker {
+    margin-top: 20px;
+  }
+  .collections-grid {
+    max-width: 520px;
+  }
+}

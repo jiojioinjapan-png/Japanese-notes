@@ -90,11 +90,10 @@ test('mobile layout, keyboard dialog dismissal, and theme preference', async ({ 
   await page.getByRole('button', { name: '切换深色模式' }).click();
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await page.getByRole('button', { name: '列表视图' }).click();
-  await expect(page.getByRole('button', { name: '列表视图' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await page.getByRole('button', { name: '搜索', exact: true }).click();
+  await expect(page.getByRole('searchbox', { name: '搜索笔记' })).toBeFocused();
+  await page.getByRole('searchbox', { name: '搜索笔记' }).fill('たさい');
+  await expect(page.getByRole('button', { name: '阅读：多彩', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

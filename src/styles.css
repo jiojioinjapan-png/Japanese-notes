@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', sans-serif;
@@ -41,6 +42,9 @@
 }
 body {
   margin: 0;
+  background: var(--bg);
+  min-height: 100dvh;
+  -webkit-text-size-adjust: 100%;
 }
 button,
 input,
@@ -1483,420 +1487,6 @@ input[type='search']::-webkit-search-cancel-button {
     display: none;
   }
 }
-@media (max-width: 650px) {
-  .sidebar {
-    position: relative;
-    width: 100%;
-    height: auto;
-    inset: auto;
-    padding: 18px 20px 0;
-    border: 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .brand {
-    padding: 0;
-  }
-  .brand strong {
-    font-size: 20px;
-  }
-  .brand small {
-    font-size: 8px;
-    letter-spacing: 2px;
-  }
-  .brand-icon {
-    width: 36px;
-    height: 38px;
-  }
-  .sidebar-label,
-  .sidebar-note,
-  .nav-divider,
-  .sidebar-bottom > span {
-    display: none;
-  }
-  .sidebar nav {
-    display: flex;
-    gap: 3px;
-    margin-top: 21px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .nav-item {
-    width: auto;
-    flex-shrink: 0;
-    gap: 5px;
-    border-radius: 5px 5px 0 0;
-    padding: 11px 8px;
-    font-size: 10px;
-  }
-  .nav-item svg {
-    width: 14px;
-    height: 14px;
-  }
-  .nav-item small {
-    font-size: 9px;
-    margin-left: 2px;
-  }
-  .nav-item.active {
-    background: var(--bg);
-    border-bottom: 2px solid var(--accent);
-  }
-  .sidebar-bottom {
-    border: 0;
-    position: absolute;
-    right: 17px;
-    top: 17px;
-    padding: 0;
-  }
-  .main-shell {
-    margin: 0;
-  }
-  .topbar {
-    height: 64px;
-    padding: 0 22px;
-    border: 0;
-  }
-  .breadcrumb {
-    font-size: 9px;
-    gap: 7px;
-  }
-  .breadcrumb > svg:first-child {
-    width: 14px;
-  }
-  .primary-button {
-    font-size: 10px;
-    padding: 10px 12px;
-    gap: 6px;
-  }
-  .primary-button svg {
-    width: 14px;
-    height: 14px;
-  }
-  .main-content {
-    padding: 21px 22px 0;
-  }
-  .eyebrow {
-    font-size: 7px;
-    letter-spacing: 1.8px;
-    margin-bottom: 12px;
-  }
-  h1 {
-    font-size: 36px;
-  }
-  .intro-description {
-    font-size: 10px;
-    margin-top: 12px;
-    letter-spacing: 0;
-  }
-  .intro {
-    margin-bottom: 34px;
-  }
-  .intro-seal {
-    display: flex;
-    gap: 7px;
-  }
-  .intro-seal span:first-child {
-    font-size: 12px;
-    letter-spacing: 2px;
-    padding: 8px 6px 8px 8px;
-  }
-  .intro-seal span:last-child {
-    font-size: 5px;
-    letter-spacing: 1px;
-  }
-  .section-heading h2 {
-    font-size: 12px;
-    gap: 10px;
-  }
-  .section-heading h2 span {
-    font-size: 6px;
-  }
-  .section-heading {
-    margin-bottom: 18px;
-  }
-  .collections-grid {
-    gap: 15px;
-  }
-  .book-cover {
-    height: 166px;
-    border-radius: 2px 5px 5px 2px;
-  }
-  .book-spine {
-    width: 10px;
-  }
-  .cover-number {
-    top: 16px;
-    left: 16px;
-    font-size: 5px;
-    letter-spacing: 1px;
-  }
-  .cover-letter {
-    left: 17px;
-    top: 47px;
-    font-size: 26px;
-    /* Stack glyphs without relying on system-font vertical metrics. */
-    writing-mode: horizontal-tb;
-    width: 1em;
-    height: 100px;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: break-all;
-    letter-spacing: 0;
-    line-height: 1.4;
-  }
-  .onomatopoeia .cover-letter {
-    font-size: 22px;
-    top: 42px;
-    left: 17px;
-    letter-spacing: 0;
-  }
-  .cover-english {
-    writing-mode: vertical-rl;
-    left: auto;
-    right: 12px;
-    top: 40px;
-    letter-spacing: 1.5px;
-    font-size: 5px;
-  }
-  .cover-footer {
-    left: 17px;
-    bottom: 12px;
-    font-size: 4px;
-    letter-spacing: 0;
-    right: 9px;
-  }
-  .cover-footer > span {
-    display: none;
-  }
-  .cover-art {
-    width: 150px;
-    height: 150px;
-    bottom: -70px;
-    right: -50px;
-  }
-  .cover-art i:nth-child(2) {
-    inset: 12px;
-  }
-  .cover-art i:nth-child(3) {
-    inset: 24px;
-  }
-  .cover-art i:nth-child(4) {
-    inset: 36px;
-  }
-  .collection-caption {
-    font-size: 11px;
-    margin-top: 13px;
-  }
-  .collection-caption svg {
-    display: none;
-  }
-  .collection-count {
-    font-size: 9px;
-    margin-top: 6px;
-  }
-  .notes-section {
-    margin-top: 29px;
-    padding-top: 24px;
-  }
-  .notes-heading {
-    margin-bottom: 20px;
-  }
-  .notes-heading h2 {
-    font-size: 20px;
-  }
-  .notes-heading p {
-    font-size: 10px;
-    margin-top: 8px;
-  }
-  .view-switch button {
-    width: 27px;
-    height: 24px;
-  }
-  .filter-toolbar {
-    gap: 10px;
-  }
-  .search-box {
-    height: 38px;
-    gap: 7px;
-    padding: 0 10px;
-  }
-  .search-box input {
-    font-size: 10px;
-  }
-  .search-box > svg {
-    width: 15px;
-  }
-  .sort-select select {
-    min-width: 95px;
-    padding: 0 7px;
-    font-size: 10px;
-    height: 38px;
-  }
-  .category-tabs {
-    gap: 4px;
-    margin: 16px 0 19px;
-  }
-  .category-tabs button {
-    padding: 6px 11px;
-    font-size: 9px;
-  }
-  .notes-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  .note-card {
-    padding: 20px;
-    min-height: 235px;
-  }
-  .note-card-top {
-    margin-bottom: 15px;
-  }
-  .note-term {
-    font-size: 28px;
-  }
-  .note-card-top > svg {
-    opacity: 0.6;
-  }
-  .note-card .note-example p {
-    font-size: 12px;
-  }
-  .type-badge {
-    font-size: 9px;
-  }
-  .note-meaning {
-    font-size: 13px;
-  }
-  .pronunciation {
-    font-size: 11px;
-  }
-  .note-card-footer {
-    font-size: 9px;
-  }
-  .note-card > p:last-of-type,
-  .note-card > .note-example {
-    margin-bottom: 18px;
-  }
-  .list-view .note-card {
-    padding: 17px 16px;
-    grid-template-columns: 75px 1fr;
-    min-height: 0;
-    gap: 8px 12px;
-  }
-  .list-view .note-term {
-    font-size: 24px;
-  }
-  .page-footer {
-    font-size: 8px;
-    margin-top: 25px;
-    padding: 20px 0;
-  }
-  .pagination {
-    font-size: 9px;
-  }
-  .import-modal {
-    padding: 23px 21px;
-    max-height: 92dvh;
-  }
-  .import-modal h2 {
-    font-size: 23px;
-  }
-  .import-tools > div {
-    gap: 10px;
-  }
-  .text-button {
-    font-size: 10px;
-  }
-  .import-tools {
-    font-size: 10px;
-  }
-  .import-hint {
-    font-size: 8px;
-    align-items: start;
-  }
-  .import-modal textarea {
-    font-size: 10px;
-    min-height: 210px;
-  }
-  .reader-toolbar {
-    padding: 12px 16px;
-  }
-  .reader-page {
-    padding: 30px 28px 20px;
-    min-height: 400px;
-  }
-  .reader-page .note-term {
-    font-size: 37px;
-  }
-  .reader-page .note-meaning {
-    font-size: 19px;
-  }
-  .reader-page .note-example {
-    padding-left: 16px;
-    margin-top: 28px;
-  }
-  .reader-page .note-example p {
-    font-size: 17px;
-  }
-  .reader-kicker {
-    margin-top: 28px;
-    font-size: 8px;
-  }
-  .large-text .reader-page .note-term {
-    font-size: 44px;
-  }
-  .large-text .reader-page .note-meaning {
-    font-size: 22px;
-  }
-  .large-text .reader-page .note-example p {
-    font-size: 21px;
-  }
-  .toast {
-    bottom: 18px;
-    font-size: 11px;
-    width: max-content;
-  }
-  .toast > span {
-    flex: 1;
-  }
-  .skeleton {
-    height: 235px;
-  }
-}
-@media (max-width: 360px) {
-  .main-content {
-    padding-left: 17px;
-    padding-right: 17px;
-  }
-  .sidebar {
-    padding-left: 15px;
-    padding-right: 15px;
-  }
-  .nav-item {
-    padding-left: 7px;
-    padding-right: 7px;
-  }
-  .collections-grid {
-    gap: 11px;
-  }
-  .book-cover {
-    height: 154px;
-  }
-  .intro-seal {
-    display: none;
-  }
-  .cover-number {
-    left: 13px;
-  }
-  .cover-letter,
-  .onomatopoeia .cover-letter {
-    left: 14px;
-  }
-  .import-tools > div {
-    gap: 6px;
-  }
-  .import-footer {
-    gap: 5px;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1905,4 +1495,30 @@ input[type='search']::-webkit-search-cancel-button {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+.mobile-header,
+.mobile-tabbar,
+.mobile-search-title {
+  display: none;
+}
+
+.brand-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.reader-page:focus,
+[data-dialog-focus]:focus {
+  outline: none;
+}
+
+:root[data-theme='dark'] .import-preview > div:first-child,
+:root[data-theme='dark'] .import-success {
+  color: #afc393;
+}
+:root[data-theme='dark'] .validation-error {
+  color: #f0a28c;
 }

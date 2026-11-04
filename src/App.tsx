@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownToLine,
@@ -82,12 +83,38 @@ function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current!;
+    const scrollY = window.scrollY;
     dialog.showModal();
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    dialog.querySelector<HTMLElement>('[data-dialog-focus]')?.focus({ preventScroll: true });
+    const body = document.body;
+    const previous = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+    };
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    const syncViewport = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) return;
+      dialog.style.setProperty('--visual-height', `${viewport.height}px`);
+      dialog.style.setProperty(
+        '--keyboard-inset',
+        `${Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)}px`,
+      );
+    };
+    syncViewport();
+    window.visualViewport?.addEventListener('resize', syncViewport);
+    window.visualViewport?.addEventListener('scroll', syncViewport);
     return () => {
       dialog.close();
-      document.body.style.overflow = previous;
+      window.visualViewport?.removeEventListener('resize', syncViewport);
+      window.visualViewport?.removeEventListener('scroll', syncViewport);
+      Object.assign(body.style, previous);
+      window.scrollTo({ top: scrollY, behavior: 'instant' });
     };
   }, []);
   return (
@@ -198,7 +225,8 @@ function NoteContent({ note, full = false }: { note: Note; full?: boolean }) {
 
 function Reader({ notes, initial, close }: { notes: Note[]; initial: number; close: () => void }) {
   const [index, setIndex] = useState(initial);
-  const [large, setLarge] = useState(false);
+  const [readerSize, setReaderSize] = usePreference('kotoba-reader-size', 'regular');
+  const large = readerSize === 'large';
   const note = notes[index];
   return (
     <Modal
@@ -215,7 +243,7 @@ function Reader({ notes, initial, close }: { notes: Note[]; initial: number; clo
             className="icon-button"
             aria-label="切换阅读字号"
             aria-pressed={large}
-            onClick={() => setLarge(!large)}
+            onClick={() => setReaderSize(large ? 'regular' : 'large')}
           >
             <Type size={20} />
           </button>
@@ -224,7 +252,7 @@ function Reader({ notes, initial, close }: { notes: Note[]; initial: number; clo
           </button>
         </div>
       </header>
-      <article className="reader-page">
+      <article className="reader-page" tabIndex={-1} data-dialog-focus>
         <span className={`type-badge ${note.type}`}>{categories[note.type].label}</span>
         <span className="reader-kicker">ことばのノート</span>
         <NoteContent note={note} full />
@@ -337,7 +365,9 @@ function Importer({
           <X size={21} />
         </button>
       </header>
-      <h2>把新发现，收进书库。</h2>
+      <h2 tabIndex={-1} data-dialog-focus>
+        把新发现，收进书库。
+      </h2>
       <p className="modal-description">粘贴 JSON，一次收藏多条笔记。</p>
       <div className="import-tools">
         <label htmlFor="json-input">
@@ -469,7 +499,12 @@ export default function App() {
   const [sort, setSort] = useState('recent');
   const [page, setPage] = useState(1);
   const [view, setView] = usePreference('kotoba-view', 'grid');
-  const [theme, setTheme] = usePreference('kotoba-theme', 'light');
+  const [theme, setTheme] = usePreference(
+    'kotoba-theme',
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+  );
+  const [mobileTab, setMobileTab] = useState<'library' | 'search'>('library');
+  const searchRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<NotesResponse>({
     notes: [],
     total: 0,
@@ -486,6 +521,9 @@ export default function App() {
   const notesRef = useRef<HTMLElement>(null);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#242522' : '#faf9f6');
   }, [theme]);
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -523,6 +561,21 @@ export default function App() {
     setPage(1);
     if (scroll) notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
+  function showLibrary() {
+    setMobileTab('library');
+    setCategory('all');
+    setSearch('');
+    setQuery('');
+    setPage(1);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  function showSearch() {
+    // Safari opens the software keyboard only when focus stays in the tap event.
+    flushSync(() => setMobileTab('search'));
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    searchRef.current?.focus({ preventScroll: true });
+  }
+
   const date = new Intl.DateTimeFormat('zh-CN', {
     month: 'long',
     day: 'numeric',
@@ -530,14 +583,31 @@ export default function App() {
   }).format(new Date());
   const pageCount = Math.max(1, Math.ceil(data.total / data.pageSize));
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${mobileTab === 'search' ? 'mobile-search-mode' : ''}`}>
       <a href="#notes" className="skip-link">
         跳到笔记
       </a>
+      <header className="mobile-header">
+        <button className="mobile-brand" aria-label="返回书库首页" onClick={showLibrary}>
+          <span className="brand-icon">
+            <img src="/icons/icon-192.png" width="34" height="36" alt="" />
+          </span>
+          <span lang="ja">
+            ことば<span>日语笔记</span>
+          </span>
+        </button>
+        <button
+          className="icon-button"
+          aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
+          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+        >
+          {theme === 'light' ? <Moon size={21} /> : <Sun size={21} />}
+        </button>
+      </header>
       <aside className="sidebar">
         <a className="brand" href="/" aria-label="ことば日语笔记首页">
           <span className="brand-icon">
-            <BookOpen size={23} strokeWidth={1.6} />
+            <img src="/icons/icon-192.png" width="41" height="43" alt="" />
           </span>
           <span>
             <strong lang="ja">ことば</strong>
@@ -603,6 +673,10 @@ export default function App() {
           </div>
         </header>
         <main className="main-content">
+          <section className="mobile-search-title" aria-label="搜索页面">
+            <h1>搜索</h1>
+            <p>在收藏里，找回那个表达。</p>
+          </section>
           <section className="intro">
             <div>
               <p className="eyebrow">A LITTLE JAPANESE, EVERY DAY</p>
@@ -686,9 +760,13 @@ export default function App() {
               <div className="search-box">
                 <Search size={17} />
                 <input
+                  ref={searchRef}
                   aria-label="搜索笔记"
                   type="search"
-                  placeholder="搜索单词、释义或例句…"
+                  enterKeyHint="search"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  placeholder="搜索词条、释义…"
                   value={search}
                   maxLength={200}
                   onChange={(event) => setSearch(event.target.value)}
@@ -840,11 +918,39 @@ export default function App() {
           </footer>
         </main>
       </div>
+      <nav className="mobile-tabbar" aria-label="主导航">
+        <button
+          aria-label="书库"
+          aria-current={mobileTab === 'library' && !importOpen ? 'page' : undefined}
+          onClick={showLibrary}
+        >
+          <Library size={24} strokeWidth={1.7} />
+          <span>书库</span>
+        </button>
+        <button
+          aria-label="搜索"
+          aria-current={mobileTab === 'search' && !importOpen ? 'page' : undefined}
+          onClick={showSearch}
+        >
+          <Search size={24} strokeWidth={1.7} />
+          <span>搜索</span>
+        </button>
+        <button
+          aria-label="导入笔记"
+          aria-haspopup="dialog"
+          aria-expanded={importOpen}
+          onClick={() => setImportOpen(true)}
+        >
+          <Plus size={25} strokeWidth={1.7} />
+          <span>导入</span>
+        </button>
+      </nav>
       {importOpen && (
         <Importer
           close={() => setImportOpen(false)}
           onImported={(message) => {
             setToast(message);
+            setMobileTab('library');
             setSearch('');
             setQuery('');
             setCategory('all');

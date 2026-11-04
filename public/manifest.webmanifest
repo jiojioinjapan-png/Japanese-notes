@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "ことば · 日语笔记",
+  "short_name": "日语笔记",
+  "description": "收藏单词、拟声拟态词与语法，随时翻开你的日语书库。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9f6",
+  "theme_color": "#faf9f6",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

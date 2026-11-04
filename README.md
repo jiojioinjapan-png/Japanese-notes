@@ -18,6 +18,33 @@ React + TypeScript + Vite 构建界面；Cloudflare Worker 提供 API 和静态�
 
 首次数据库迁移会加入项目需求中的三条示例：`多彩`、`あたふた`、`だけあって`。后续部署不会再次加入示例，也不会清空已有笔记。
 
+## iPhone 与添加到主屏幕
+
+针对 iPhone 优先设计：底部「书库 / 搜索 / 导入」导航、44px 以上的主要触控区域、放大的词条 / 释义 / 例句，以及整屏纸页阅读。阅读正文单独滚动，顶部关闭与底部翻页控件固定；大字号设置会保留。刘海、横屏左右边缘和底部手势区通过安全区适配，输入框使用至少 16px 字号。
+
+<img src="docs/iphone-library.png" width="300" alt="iPhone 书库界面" /> <img src="docs/iphone-reader.png" width="300" alt="iPhone 整屏阅读界面" />
+
+添加方法：
+
+1. 在 iPhone 的 Safari 中打开部署后的 **HTTPS** 网址。
+2. 点击「分享」→「添加到主屏幕」，名称可保留为「日语笔记」。如果系统显示「作为 Web App 打开」，请开启。
+3. 点击「添加」，以后从主屏幕图标进入，会以独立窗口打开。
+
+已提供 180px 的 Apple Touch Icon、192px / 512px 的 Web App 图标、独立的 maskable 图标、Safari 固定标签页图标以及 SVG / PNG / ICO 标签页图标。图标来自项目自带的书本矢量稿；iOS 会应用系统的图标圆角。已添加旧快捷方式时，可移除旧图标后重新添加，以获取更新后的图标。
+
+首次启动跟随系统的浅色 / 深色偏好，也可以点击页面右上角切换；后续启动保留手动选择。应用通过联网访问 D1 读取、导入笔记。
+
+浏览器测试覆盖 WebKit 引擎的 320 / 375 / 393 / 430px iPhone 模拟视口、横屏、模拟安全区、整屏阅读、长例句滚动、字号保留、导入以及图标文件尺寸。这些是模拟测试，不代表已经在实体 iPhone 上逐项验证系统状态栏和软件键盘。
+
+图标源文件：[public/icons/app-icon.svg](./public/icons/app-icon.svg)。需要更新图标时，修改矢量稿后运行：
+
+```bash
+npx playwright install chromium
+npm run icons
+```
+
+参考：[Apple 的添加主屏幕说明](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios)、[WebKit 安全区说明](https://webkit.org/blog/7929/designing-websites-for-iphone-x/)。
+
 ## 连接 GitHub 部署到 Cloudflare
 
 这是一套 **Workers + Static Assets + D1** 应用。请创建 **Worker**，使用 Cloudflare 的 GitHub 集成部署。
@@ -171,11 +198,11 @@ npm run dev
 ```bash
 npm run check
 npm test
-npx playwright install chromium
+npx playwright install --with-deps chromium webkit
 npm run test:e2e
 ```
 
-集成测试在独立的 Miniflare D1 中验证实际 SQL、500 条导入、去重和事务回滚。浏览器测试会自动构建并启动本地 Worker，使用 `.wrangler/e2e` 的独立测试数据库，以及公开的测试专用密钥，不影响开发 / 生产数据库。GitHub Actions 会自动运行测试与构建。
+集成测试在独立的 Miniflare D1 中验证实际 SQL、500 条导入、去重和事务回滚。浏览器测试会自动构建并启动本地 Worker，每次重建 `.wrangler/e2e` 的独立测试数据库，使用公开的测试专用密钥，不影响开发 / 生产数据库。GitHub Actions 会自动运行测试与构建。
 
 ## API
 
@@ -197,11 +224,13 @@ npm run test:e2e
 ## 项目结构
 
 ```text
-src/                     React 界面、阅读与导入交互
+src/                     React 界面、iPhone 布局、阅读与导入交互
 shared/notes.ts          三类笔记的数据类型和前后端共享校验
 worker/index.ts         Worker API、鉴权、D1 查询与事务导入
 migrations/             D1 数据库迁移与首次示例数据
 examples/notes.json      可上传的 JSON 示例
+public/                  主屏幕 manifest、图标及静态资源
+scripts/                 图标生成和隔离测试服务器
 tests/                  输入校验、真实 D1 集成测试、浏览器测试
 wrangler.jsonc          Worker、静态资源与 D1 绑定配置
 .github/workflows/      GitHub 自动检查
