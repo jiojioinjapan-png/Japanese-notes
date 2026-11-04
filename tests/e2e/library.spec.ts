@@ -21,7 +21,12 @@ test('word card retains its reading order and opens a complete reading page', as
   await page.getByRole('button', { name: '关闭阅读' }).click();
   await returnHome(page);
   await page.getByRole('button', { name: '查看拟声拟态词', exact: false }).click();
-  await expect(page.locator('.note-card').first()).toHaveClass(/onomatopoeia/);
+  const collection = page.getByRole('dialog', { name: '拟声拟态词预览列表' });
+  await expect(collection).toBeVisible();
+  await expect(
+    collection.getByRole('button', { name: '阅读：あたふた', exact: true }),
+  ).toBeVisible();
+  await collection.getByRole('button', { name: '返回书库', exact: true }).click();
   await expectFixedViewport(page);
 });
 

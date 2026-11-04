@@ -13,12 +13,14 @@ export default function Reader({
   initialIndex,
   source,
   historyKey,
+  returnLabel = '返回书库',
   close,
 }: {
   initialNote: Note;
   initialIndex: number;
   source: ReaderSource;
   historyKey: string;
+  returnLabel?: string;
   close: (position: number) => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
@@ -189,7 +191,7 @@ export default function Reader({
     >
       <header className="reader-toolbar">
         <button className="text-button" onClick={() => close(position.current)}>
-          <ArrowLeft size={18} /> 返回书库
+          <ArrowLeft size={18} /> {returnLabel}
         </button>
         <div className="reader-actions">
           <button

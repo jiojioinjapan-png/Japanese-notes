@@ -18,7 +18,8 @@ export default function BookCover({
       className={`collection ${type} ${active ? 'selected' : ''}`}
       onClick={onClick}
       aria-label={`查看${meta.label}，${count} 条笔记`}
-      aria-pressed={active}
+      aria-haspopup="dialog"
+      aria-expanded={active}
     >
       <div className="book-cover">
         <div className="book-spine" />

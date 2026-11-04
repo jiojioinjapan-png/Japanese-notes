@@ -1,5 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
+let openModals = 0;
+let unlockBody: (() => void) | undefined;
+
 export default function Modal({
   title,
   children,
@@ -17,17 +20,24 @@ export default function Modal({
     const scrollY = window.scrollY;
     dialog.showModal();
     dialog.querySelector<HTMLElement>('[data-dialog-focus]')?.focus({ preventScroll: true });
-    const body = document.body;
-    const previous = {
-      overflow: body.style.overflow,
-      position: body.style.position,
-      top: body.style.top,
-      width: body.style.width,
-    };
-    body.style.overflow = 'hidden';
-    body.style.position = 'fixed';
-    body.style.top = `-${scrollY}px`;
-    body.style.width = '100%';
+    if (openModals === 0) {
+      const body = document.body;
+      const previous = {
+        overflow: body.style.overflow,
+        position: body.style.position,
+        top: body.style.top,
+        width: body.style.width,
+      };
+      body.style.overflow = 'hidden';
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollY}px`;
+      body.style.width = '100%';
+      unlockBody = () => {
+        Object.assign(body.style, previous);
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      };
+    }
+    openModals += 1;
     const syncViewport = () => {
       const viewport = window.visualViewport;
       if (!viewport) return;
@@ -44,8 +54,11 @@ export default function Modal({
       dialog.close();
       window.visualViewport?.removeEventListener('resize', syncViewport);
       window.visualViewport?.removeEventListener('scroll', syncViewport);
-      Object.assign(body.style, previous);
-      window.scrollTo({ top: scrollY, behavior: 'instant' });
+      openModals -= 1;
+      if (openModals === 0) {
+        unlockBody?.();
+        unlockBody = undefined;
+      }
     };
   }, []);
   return (

@@ -25,12 +25,14 @@ import {
   type Category,
   type Note,
   type NotesResponse,
+  type NoteType,
 } from '../shared/notes';
 import { responseBody } from './api';
 import { usePreference, useTheme } from './preferences';
 import { useShelfLayout } from './useShelfLayout';
 import { useSwipe } from './useSwipe';
 import BookCover from './components/BookCover';
+import CollectionList from './components/CollectionList';
 import Importer from './components/Importer';
 import NoteContent from './components/NoteContent';
 import Reader, { type ReaderSource } from './components/Reader';
@@ -66,6 +68,9 @@ export default function App({
   const [refresh, setRefresh] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [reader, setReader] = useState<OpenReader | null>(null);
+  const [collection, setCollection] = useState<{ category: NoteType; historyKey: string } | null>(
+    null,
+  );
   const [toast, setToast] = useState('');
   const [pageDirection, setPageDirection] = useState<-1 | 1>(1);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -117,9 +122,11 @@ export default function App({
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
-    if (history.state?.kotobaReader) history.replaceState(null, '');
+    if (history.state?.kotobaReader || history.state?.kotobaCollection)
+      history.replaceState(null, '');
     return () => {
-      if (history.state?.kotobaReader) history.replaceState(null, '');
+      if (history.state?.kotobaReader || history.state?.kotobaCollection)
+        history.replaceState(null, '');
     };
   }, []);
   const pageCount = Math.max(1, Math.ceil(data.total / shelf.pageSize));
@@ -153,7 +160,7 @@ export default function App({
     setPage((current) => Math.max(1, Math.min(pageCount, current + direction)));
   }
   const swipe = useSwipe({
-    disabled: loading || !!reader || importOpen,
+    disabled: loading || !!reader || !!collection || importOpen,
     canPrevious: page > 1,
     canNext: page < pageCount,
     onTurn: turnShelf,
@@ -161,7 +168,8 @@ export default function App({
   function openReader(note: Note, index: number) {
     if (swipe.suppressClick()) return;
     const historyKey = crypto.randomUUID();
-    if (history.state?.kotobaReader) history.replaceState(null, '');
+    if (history.state?.kotobaReader || history.state?.kotobaCollection)
+      history.replaceState(null, '');
     history.pushState({ kotobaReader: historyKey }, '');
     setReader({
       note,
@@ -175,6 +183,16 @@ export default function App({
     setPage(Math.floor(position / shelf.pageSize) + 1);
     setReader(null);
     if (history.state?.kotobaReader === key) history.back();
+  }
+  function openCollection(type: NoteType) {
+    const historyKey = crypto.randomUUID();
+    history.pushState({ kotobaCollection: historyKey }, '');
+    setCollection({ category: type, historyKey });
+  }
+  function closeCollection() {
+    const key = collection?.historyKey;
+    setCollection(null);
+    if (key && history.state?.kotobaCollection === key) history.back();
   }
   const rows = Math.max(1, Math.min(shelf.rows, Math.ceil(data.notes.length / shelf.columns)));
   return (
@@ -306,8 +324,8 @@ export default function App({
                   key={type}
                   type={type}
                   count={data.counts[type]}
-                  active={category === type}
-                  onClick={() => selectCategory(type)}
+                  active={collection?.category === type}
+                  onClick={() => openCollection(type)}
                 />
               ))}
             </div>
@@ -520,6 +538,15 @@ export default function App({
           <span>导入</span>
         </button>
       </nav>
+      {collection && (
+        <CollectionList
+          category={collection.category}
+          sort={sort}
+          initialCount={data.counts[collection.category]}
+          historyKey={collection.historyKey}
+          close={closeCollection}
+        />
+      )}
       {reader && (
         <Reader
           initialNote={reader.note}
