@@ -14,7 +14,7 @@
       "binding": "DB",
       "database_name": "japanese-notes-db",
       // Replace with the ID of your Cloudflare D1 database before deploying.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "0e294f52-f0d2-4f44-94bd-220fd5bf55d6",
       "migrations_dir": "migrations",
     },
   ],
