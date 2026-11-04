@@ -1,0 +1,26 @@
+{
+  "notes": [
+    {
+      "type": "word",
+      "term": "多彩",
+      "reading": "たさい",
+      "accent": 0,
+      "partOfSpeech": "形动",
+      "meaning": "丰富多彩"
+    },
+    {
+      "type": "onomatopoeia",
+      "term": "あたふた",
+      "meaning": "慌慌张张",
+      "example": "あたふたと資料を探してしまい恥ずかしかった。",
+      "exampleTranslation": "慌慌张张地找资料，觉得很不好意思。"
+    },
+    {
+      "type": "grammar",
+      "term": "だけあって",
+      "meaning": "不愧是……",
+      "example": "彼は留学経験があるだけあって、英語が上手だ。",
+      "exampleTranslation": "他不愧有过留学经历，英语说得很好。"
+    }
+  ]
+}

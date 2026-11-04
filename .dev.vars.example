@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local development. Never commit your real secret.
+ADMIN_TOKEN="replace-with-your-own-import-key"
