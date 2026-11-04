@@ -3,6 +3,7 @@ import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, Moon, Sun } from 'l
 import App from './App';
 import { responseBody } from './api';
 import { useTheme } from './preferences';
+import { useViewport } from './useViewport';
 
 type Session = { authenticated: boolean; username?: string };
 
@@ -195,6 +196,7 @@ function Login({
 }
 
 export default function AuthGate() {
+  useViewport();
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState('');

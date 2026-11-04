@@ -470,3 +470,212 @@
     padding-top: 5px;
   }
 }
+
+/* The login screen also stays within the installed app viewport. */
+.auth-screen {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.auth-header,
+.auth-footer {
+  flex-shrink: 0;
+}
+.auth-main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.auth-loading {
+  min-height: 0;
+  height: 100%;
+}
+@media (max-height: 760px) {
+  .auth-intro {
+    display: none;
+  }
+  .auth-main {
+    display: flex;
+    justify-content: center;
+    padding-top: 8px;
+    padding-bottom: 12px;
+    max-width: 460px;
+  }
+  .login-card {
+    width: 100%;
+    padding: 21px 25px;
+  }
+  .login-symbol {
+    display: none;
+  }
+  .login-card h2 {
+    font-size: 26px;
+    line-height: 1.4;
+  }
+  .login-description {
+    font-size: 13px;
+    margin-top: 5px;
+  }
+  .login-card form {
+    margin-top: 16px;
+  }
+  .login-card label {
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .login-card label[for='login-password'] {
+    margin-top: 13px;
+  }
+  .login-card input {
+    min-height: 46px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .login-password > button {
+    top: 1px;
+  }
+  .login-submit {
+    min-height: 46px;
+    margin-top: 17px;
+  }
+  .login-footnote {
+    margin-top: 14px;
+    font-size: 11px;
+  }
+  .login-error,
+  .login-notice {
+    font-size: 12px;
+    line-height: 1.6;
+    padding: 7px 10px;
+    margin-top: 10px;
+  }
+  .auth-footer {
+    padding-top: 4px;
+    padding-bottom: max(12px, var(--safe-bottom));
+  }
+}
+@media (max-height: 620px) {
+  .auth-header {
+    padding-top: calc(10px + var(--safe-top));
+    padding-bottom: 7px;
+  }
+  .auth-footer,
+  .login-footnote {
+    display: none;
+  }
+  .auth-main {
+    padding-top: 3px;
+    padding-bottom: max(12px, var(--safe-bottom));
+  }
+  .login-card {
+    padding: 17px 20px;
+  }
+  .login-card h2 {
+    font-size: 25px;
+  }
+  .login-description {
+    font-size: 12px;
+    margin-top: 3px;
+  }
+  .login-card form {
+    margin-top: 13px;
+  }
+  .login-card label {
+    font-size: 13px;
+    margin-bottom: 5px;
+  }
+  .login-card label[for='login-password'] {
+    margin-top: 11px;
+  }
+  .login-card input {
+    min-height: 44px;
+    padding: 9px 13px;
+  }
+  .login-password input {
+    padding-right: 52px;
+  }
+  .login-password > button {
+    top: 0;
+  }
+  .login-submit {
+    min-height: 44px;
+    margin-top: 13px;
+  }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  .auth-header {
+    padding-top: calc(4px + var(--safe-top));
+    padding-bottom: 4px;
+  }
+  .auth-main {
+    max-width: 680px;
+  }
+  .login-card {
+    padding: 13px 20px;
+  }
+  .login-card h2 {
+    font-size: 23px;
+  }
+  .login-description {
+    display: none;
+  }
+  .login-card form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 16px;
+    margin-top: 11px;
+  }
+  .login-card label {
+    margin: 0 !important;
+    grid-row: 1;
+  }
+  .login-card label[for='login-username'],
+  #login-username {
+    grid-column: 1;
+  }
+  .login-card label[for='login-password'],
+  .login-password {
+    grid-column: 2;
+  }
+  #login-username,
+  .login-password {
+    grid-row: 2;
+  }
+  .login-submit,
+  .login-error,
+  .login-notice,
+  .login-retry {
+    grid-column: 1/-1;
+    margin: 0;
+  }
+  .login-error,
+  .login-notice {
+    grid-row: 3;
+  }
+  .login-submit {
+    grid-row: 4;
+  }
+  .login-retry {
+    min-height: 36px;
+  }
+}
+html[data-keyboard='true'] .auth-header,
+html[data-keyboard='true'] .auth-intro,
+html[data-keyboard='true'] .auth-footer,
+html[data-keyboard='true'] .login-footnote {
+  display: none;
+}
+html[data-keyboard='true'] .auth-main {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+html[data-keyboard='true'] .login-card {
+  padding: 13px 20px;
+}
+html[data-keyboard='true'] .login-card h2,
+html[data-keyboard='true'] .login-description {
+  display: none;
+}
+html[data-keyboard='true'] .login-card form {
+  margin-top: 0;
+}

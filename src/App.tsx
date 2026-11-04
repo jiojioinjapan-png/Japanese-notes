@@ -1,16 +1,11 @@
 import { flushSync } from 'react-dom';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  ArrowDownToLine,
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   Check,
   ChevronLeft,
   ChevronRight,
-  CircleHelp,
-  Code2,
-  FileJson,
   Headphones,
   LayoutGrid,
   Library,
@@ -20,441 +15,28 @@ import {
   Moon,
   Plus,
   Search,
-  Sparkles,
   Sun,
   Type,
-  Upload,
   X,
 } from 'lucide-react';
 import {
   categories,
-  exampleImport,
   NOTE_TYPES,
-  validateImport,
-  ValidationError,
   type Category,
-  type Counts,
   type Note,
-  type NoteInput,
   type NotesResponse,
-  type NoteType,
 } from '../shared/notes';
-
 import { responseBody } from './api';
 import { usePreference, useTheme } from './preferences';
+import { useShelfLayout } from './useShelfLayout';
+import { useSwipe } from './useSwipe';
+import BookCover from './components/BookCover';
+import Importer from './components/Importer';
+import NoteContent from './components/NoteContent';
+import Reader, { type ReaderSource } from './components/Reader';
 
-const emptyCounts: Counts = { all: 0, word: 0, onomatopoeia: 0, grammar: 0 };
+type OpenReader = { note: Note; index: number; source: ReaderSource; historyKey: string };
 const icons = { word: Type, onomatopoeia: Headphones, grammar: BookOpen };
-function Modal({
-  title,
-  children,
-  close,
-  className = '',
-}: {
-  title: string;
-  children: ReactNode;
-  close: () => void;
-  className?: string;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current!;
-    const scrollY = window.scrollY;
-    dialog.showModal();
-    dialog.querySelector<HTMLElement>('[data-dialog-focus]')?.focus({ preventScroll: true });
-    const body = document.body;
-    const previous = {
-      overflow: body.style.overflow,
-      position: body.style.position,
-      top: body.style.top,
-      width: body.style.width,
-    };
-    body.style.overflow = 'hidden';
-    body.style.position = 'fixed';
-    body.style.top = `-${scrollY}px`;
-    body.style.width = '100%';
-    const syncViewport = () => {
-      const viewport = window.visualViewport;
-      if (!viewport) return;
-      dialog.style.setProperty('--visual-height', `${viewport.height}px`);
-      dialog.style.setProperty(
-        '--keyboard-inset',
-        `${Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)}px`,
-      );
-    };
-    syncViewport();
-    window.visualViewport?.addEventListener('resize', syncViewport);
-    window.visualViewport?.addEventListener('scroll', syncViewport);
-    return () => {
-      dialog.close();
-      window.visualViewport?.removeEventListener('resize', syncViewport);
-      window.visualViewport?.removeEventListener('scroll', syncViewport);
-      Object.assign(body.style, previous);
-      window.scrollTo({ top: scrollY, behavior: 'instant' });
-    };
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      className={`modal ${className}`}
-      aria-label={title}
-      onCancel={(event) => {
-        event.preventDefault();
-        close();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          const box = event.currentTarget.getBoundingClientRect();
-          if (
-            event.clientX < box.left ||
-            event.clientX > box.right ||
-            event.clientY < box.top ||
-            event.clientY > box.bottom
-          )
-            close();
-        }
-      }}
-    >
-      {children}
-    </dialog>
-  );
-}
-
-function BookCover({
-  type,
-  count,
-  onClick,
-  active,
-}: {
-  type: NoteType;
-  count: number;
-  onClick: () => void;
-  active: boolean;
-}) {
-  const meta = categories[type];
-  return (
-    <button
-      className={`collection ${type} ${active ? 'selected' : ''}`}
-      onClick={onClick}
-      aria-label={`查看${meta.label}，${count} 条笔记`}
-      aria-pressed={active}
-    >
-      <div className="book-cover">
-        <div className="book-spine" />
-        <span className="cover-number">
-          VOL. {String(NOTE_TYPES.indexOf(type) + 1).padStart(2, '0')}
-        </span>
-        <div className="cover-letter" lang="ja">
-          {type === 'word' ? '言葉' : type === 'onomatopoeia' ? '音と形' : '文法'}
-        </div>
-        <span className="cover-english">{meta.english}</span>
-        <div className="cover-art" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-          <i />
-        </div>
-        <span className="cover-footer">
-          ことばのコレクション <span>日</span>
-        </span>
-      </div>
-      <div className="collection-caption">
-        <span>{meta.label}</span>
-        <ArrowRight size={16} />
-      </div>
-      <span className="collection-count">{count} 条笔记</span>
-    </button>
-  );
-}
-
-function NoteContent({ note, full = false }: { note: Note; full?: boolean }) {
-  return (
-    <>
-      <h3 className="note-term" lang="ja">
-        {note.term}
-      </h3>
-      {note.type === 'word' && (
-        <div className="pronunciation">
-          <span lang="ja">{note.reading}</span>
-          <span
-            className="accent"
-            title={`${note.accent} 调${note.accent === 0 ? ' · 平板型' : ''}`}
-          >
-            {note.accent}
-          </span>
-          <span className="part-of-speech">{note.partOfSpeech}</span>
-        </div>
-      )}
-      <p className="note-meaning">{note.meaning}</p>
-      {note.example && (
-        <div className={`note-example ${full ? 'full' : ''}`}>
-          <span className="example-label">例句</span>
-          <p lang="ja">{note.example}</p>
-          {full && note.exampleTranslation && (
-            <p className="example-translation">{note.exampleTranslation}</p>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
-
-function Reader({ notes, initial, close }: { notes: Note[]; initial: number; close: () => void }) {
-  const [index, setIndex] = useState(initial);
-  const [readerSize, setReaderSize] = usePreference('kotoba-reader-size', 'regular');
-  const large = readerSize === 'large';
-  const note = notes[index];
-  return (
-    <Modal
-      title="笔记阅读"
-      close={close}
-      className={`reader ${note.type} ${large ? 'large-text' : ''}`}
-    >
-      <header className="reader-toolbar">
-        <button className="text-button" onClick={close}>
-          <ArrowLeft size={17} /> 返回书库
-        </button>
-        <div className="reader-actions">
-          <button
-            className="icon-button"
-            aria-label="切换阅读字号"
-            aria-pressed={large}
-            onClick={() => setReaderSize(large ? 'regular' : 'large')}
-          >
-            <Type size={20} />
-          </button>
-          <button className="icon-button" aria-label="关闭阅读" onClick={close}>
-            <X size={20} />
-          </button>
-        </div>
-      </header>
-      <article className="reader-page" tabIndex={-1} data-dialog-focus>
-        <span className={`type-badge ${note.type}`}>{categories[note.type].label}</span>
-        <span className="reader-kicker">ことばのノート</span>
-        <NoteContent note={note} full />
-        <div className="reader-end" aria-hidden="true">
-          ✳
-        </div>
-      </article>
-      <footer className="reader-footer">
-        <button
-          className="icon-button"
-          aria-label="上一篇"
-          disabled={index === 0}
-          onClick={() => setIndex(index - 1)}
-        >
-          <ChevronLeft size={21} />
-        </button>
-        <span>
-          {index + 1} / {notes.length}
-        </span>
-        <button
-          className="icon-button"
-          aria-label="下一篇"
-          disabled={index === notes.length - 1}
-          onClick={() => setIndex(index + 1)}
-        >
-          <ChevronRight size={21} />
-        </button>
-      </footer>
-    </Modal>
-  );
-}
-
-function Importer({
-  close,
-  onImported,
-}: {
-  close: () => void;
-  onImported: (message: string) => void;
-}) {
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const validation = useMemo((): { notes: NoteInput[]; error: string } => {
-    if (!code.trim()) return { notes: [], error: '' };
-    if (new TextEncoder().encode(code).byteLength > 1024 * 1024)
-      return { notes: [], error: 'JSON 超过 1 MiB，请分批导入。' };
-    try {
-      return { notes: validateImport(JSON.parse(code)), error: '' };
-    } catch (e) {
-      return {
-        notes: [],
-        error:
-          e instanceof ValidationError
-            ? e.issues.join('\n')
-            : 'JSON 无法解析，请检查双引号、逗号和括号。',
-      };
-    }
-  }, [code]);
-  async function loadFile(file?: File) {
-    if (!file) return;
-    setError('');
-    if (file.size > 1024 * 1024) {
-      setError('文件超过 1 MiB，请分批导入。');
-      return;
-    }
-    try {
-      setCode(await file.text());
-      setResult(null);
-    } catch {
-      setError('无法读取文件，请重新选择。');
-    }
-  }
-  async function upload() {
-    setBusy(true);
-    setError('');
-    setResult(null);
-    try {
-      const response = await fetch('/api/notes/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: validation.notes }),
-      });
-      const body = await responseBody<{ inserted: number; skipped: number }>(response);
-      setResult(body);
-      onImported(
-        `已新增 ${body.inserted} 条笔记${body.skipped ? `，跳过 ${body.skipped} 条重复笔记` : ''}。`,
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '上传失败，请稍后重试。');
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Modal
-      title="批量导入笔记"
-      close={() => {
-        if (!busy) close();
-      }}
-      className="import-modal"
-    >
-      <header className="modal-header">
-        <div className="modal-symbol">
-          <ArrowDownToLine size={22} />
-        </div>
-        <button className="icon-button" aria-label="关闭导入" onClick={close} disabled={busy}>
-          <X size={21} />
-        </button>
-      </header>
-      <h2 tabIndex={-1} data-dialog-focus>
-        把新发现，收进书库。
-      </h2>
-      <p className="modal-description">粘贴 JSON，一次收藏多条笔记。</p>
-      <div className="import-tools">
-        <label htmlFor="json-input">
-          笔记内容 <span>JSON</span>
-        </label>
-        <div>
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => {
-              setCode(JSON.stringify(exampleImport, null, 2));
-              setError('');
-              setResult(null);
-            }}
-          >
-            填入示例
-          </button>
-          <button className="text-button" disabled={busy} onClick={() => fileRef.current?.click()}>
-            <FileJson size={15} /> 选择文件
-          </button>
-        </div>
-      </div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".json,application/json"
-        className="visually-hidden"
-        disabled={busy}
-        onChange={(event) => {
-          void loadFile(event.target.files?.[0]);
-          event.target.value = '';
-        }}
-      />
-      <textarea
-        id="json-input"
-        value={code}
-        spellCheck={false}
-        disabled={busy}
-        placeholder={
-          '{\n  "notes": [\n    {\n      "type": "word",\n      "term": "多彩",\n      "reading": "たさい",\n      "accent": 0,\n      "partOfSpeech": "形动",\n      "meaning": "丰富多彩"\n    }\n  ]\n}'
-        }
-        onChange={(event) => {
-          setCode(event.target.value);
-          setError('');
-          setResult(null);
-        }}
-      />
-      {validation.error && (
-        <p className="validation-error" role="status">
-          {validation.error}
-        </p>
-      )}
-      {validation.notes.length > 0 && (
-        <div className="import-preview">
-          <div>
-            <Check size={16} />
-            <strong>{validation.notes.length} 条笔记通过检查</strong>
-          </div>
-          <p>
-            {NOTE_TYPES.map(
-              (type) =>
-                `${categories[type].label} ${validation.notes.filter((note) => note.type === type).length}`,
-            ).join(' · ')}
-          </p>
-          <div className="preview-terms">
-            {validation.notes.slice(0, 5).map((note, i) => (
-              <span key={i} lang="ja">
-                {note.term}
-              </span>
-            ))}
-            {validation.notes.length > 5 && <span>+{validation.notes.length - 5}</span>}
-          </div>
-        </div>
-      )}
-      <p className="import-hint">
-        <CircleHelp size={14} /> 每批最多 500 条、1 MiB；完全相同的笔记会自动跳过。
-      </p>
-      {error && (
-        <p className="validation-error" role="alert">
-          {error}
-        </p>
-      )}
-      {result && (
-        <div className="import-success" role="status">
-          <Check size={19} />
-          <span>
-            导入完成，新增 {result.inserted} 条，跳过 {result.skipped} 条重复笔记。
-          </span>
-        </div>
-      )}
-      <footer className="import-footer">
-        <a
-          className="text-button"
-          href="https://github.com/jiojioinjapan-png/Japanese-notes#json-导入格式"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Code2 size={16} /> JSON 格式说明
-        </a>
-        <button
-          className="primary-button"
-          disabled={busy || !validation.notes.length || !!result}
-          onClick={() => void upload()}
-        >
-          {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
-          {busy ? '正在上传…' : '上传笔记'}
-        </button>
-      </footer>
-    </Modal>
-  );
-}
-
 export default function App({
   username,
   onLogout,
@@ -471,22 +53,30 @@ export default function App({
   const [page, setPage] = useState(1);
   const [view, setView] = usePreference('kotoba-view', 'grid');
   const [theme, setTheme] = useTheme();
-  const [mobileTab, setMobileTab] = useState<'library' | 'search'>('library');
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<'library' | 'search'>('library');
   const [data, setData] = useState<NotesResponse>({
     notes: [],
     total: 0,
     page: 1,
-    pageSize: 24,
-    counts: emptyCounts,
+    pageSize: 1,
+    counts: { all: 0, word: 0, onomatopoeia: 0, grammar: 0 },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
-  const [reader, setReader] = useState<{ notes: Note[]; index: number } | null>(null);
+  const [reader, setReader] = useState<OpenReader | null>(null);
   const [toast, setToast] = useState('');
-  const notesRef = useRef<HTMLElement>(null);
+  const [pageDirection, setPageDirection] = useState<-1 | 1>(1);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const shelf = useShelfLayout();
+  const oldPageSize = useRef(shelf.pageSize);
+  useEffect(() => {
+    const previous = oldPageSize.current;
+    oldPageSize.current = shelf.pageSize;
+    if (previous !== shelf.pageSize)
+      setPage((current) => Math.floor(((current - 1) * previous) / shelf.pageSize) + 1);
+  }, [shelf.pageSize]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setQuery(search.trim());
@@ -498,93 +88,101 @@ export default function App({
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    const params = new URLSearchParams({ category, q: query, sort, page: String(page) });
+    const params = new URLSearchParams({
+      category,
+      q: query,
+      sort,
+      page: String(page),
+      pageSize: String(shelf.pageSize),
+    });
     fetch(`/api/notes?${params}`, { signal: controller.signal })
-      .then((response) => responseBody<NotesResponse>(response))
-      .then((body) => {
-        setData(body);
-        setLoading(false);
+      .then(responseBody<NotesResponse>)
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setData(result);
+          setLoading(false);
+        }
       })
-      .catch((e: Error) => {
-        if (e.name !== 'AbortError') {
-          setError(e.message);
+      .catch((cause: Error) => {
+        if (cause.name !== 'AbortError') {
+          setError(cause.message);
           setLoading(false);
         }
       });
     return () => controller.abort();
-  }, [category, query, sort, page, refresh]);
+  }, [category, query, sort, page, shelf.pageSize, refresh]);
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(''), 6500);
+    const timer = setTimeout(() => setToast(''), 6000);
     return () => clearTimeout(timer);
   }, [toast]);
-  const selectCategory = useCallback((next: Category, scroll = false) => {
+  useEffect(() => {
+    if (history.state?.kotobaReader) history.replaceState(null, '');
+    return () => {
+      if (history.state?.kotobaReader) history.replaceState(null, '');
+    };
+  }, []);
+  const pageCount = Math.max(1, Math.ceil(data.total / shelf.pageSize));
+  const selectCategory = (next: Category) => {
     setCategory(next);
     setPage(1);
-    if (scroll) notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
-  async function handleLogout() {
+  };
+  function showLibrary() {
+    setTab('library');
+    selectCategory('all');
+    setSearch('');
+    setQuery('');
+  }
+  function showSearch() {
+    flushSync(() => {
+      setTab('search');
+      setPage(1);
+    });
+    searchRef.current?.focus({ preventScroll: true });
+  }
+  async function logout() {
     try {
       await onLogout();
     } catch {
       setToast('退出失败，请检查网络后重试。');
     }
   }
-  function showLibrary() {
-    setMobileTab('library');
-    setCategory('all');
-    setSearch('');
-    setQuery('');
-    setPage(1);
-    window.scrollTo({ top: 0, behavior: 'instant' });
+  function turnShelf(direction: -1 | 1) {
+    if (loading) return;
+    setPageDirection(direction);
+    setPage((current) => Math.max(1, Math.min(pageCount, current + direction)));
   }
-  function showSearch() {
-    // Safari opens the software keyboard only when focus stays in the tap event.
-    flushSync(() => setMobileTab('search'));
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    searchRef.current?.focus({ preventScroll: true });
+  const swipe = useSwipe({
+    disabled: loading || !!reader || importOpen,
+    canPrevious: page > 1,
+    canNext: page < pageCount,
+    onTurn: turnShelf,
+  });
+  function openReader(note: Note, index: number) {
+    if (swipe.suppressClick()) return;
+    const historyKey = crypto.randomUUID();
+    if (history.state?.kotobaReader) history.replaceState(null, '');
+    history.pushState({ kotobaReader: historyKey }, '');
+    setReader({
+      note,
+      index: (data.page - 1) * data.pageSize + index,
+      source: { category, query, sort, total: data.total },
+      historyKey,
+    });
   }
-
-  const date = new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  }).format(new Date());
-  const pageCount = Math.max(1, Math.ceil(data.total / data.pageSize));
+  function closeReader(position: number) {
+    const key = reader?.historyKey;
+    setPage(Math.floor(position / shelf.pageSize) + 1);
+    setReader(null);
+    if (history.state?.kotobaReader === key) history.back();
+  }
+  const rows = Math.max(1, Math.min(shelf.rows, Math.ceil(data.notes.length / shelf.columns)));
   return (
-    <div className={`app-shell ${mobileTab === 'search' ? 'mobile-search-mode' : ''}`}>
-      <a href="#notes" className="skip-link">
-        跳到笔记
-      </a>
-      <header className="mobile-header">
-        <button className="mobile-brand" aria-label="返回书库首页" onClick={showLibrary}>
-          <span className="brand-icon">
-            <img src="/icons/icon-192.png" width="34" height="36" alt="" />
-          </span>
-          <span lang="ja">
-            ことば<span>日语笔记</span>
-          </span>
-        </button>
-        <div className="mobile-header-actions">
-          <button
-            className="icon-button"
-            aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          >
-            {theme === 'light' ? <Moon size={21} /> : <Sun size={21} />}
-          </button>
-          <button
-            className="icon-button"
-            aria-label="退出登录"
-            disabled={logoutBusy}
-            onClick={() => void handleLogout()}
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
-      </header>
+    <div
+      className={`app-shell ${tab === 'search' ? 'mobile-search-mode' : ''} ${category !== 'all' ? 'filtered-library' : ''}`}
+    >
       <aside className="sidebar">
-        <a className="brand" href="/" aria-label="ことば日语笔记首页">
+        <button className="brand" onClick={showLibrary}>
           <span className="brand-icon">
             <img src="/icons/icon-192.png" width="41" height="43" alt="" />
           </span>
@@ -592,12 +190,15 @@ export default function App({
             <strong lang="ja">ことば</strong>
             <small>日语笔记</small>
           </span>
-        </a>
+        </button>
         <div className="sidebar-label">我的空间</div>
         <nav aria-label="笔记分类">
           <button
             className={`nav-item ${category === 'all' ? 'active' : ''}`}
-            onClick={() => selectCategory('all')}
+            onClick={() => {
+              setTab('library');
+              selectCategory('all');
+            }}
           >
             <Library size={19} />
             <span>全部笔记</span>
@@ -610,7 +211,10 @@ export default function App({
               <button
                 key={type}
                 className={`nav-item ${category === type ? 'active' : ''}`}
-                onClick={() => selectCategory(type)}
+                onClick={() => {
+                  setTab('library');
+                  selectCategory(type);
+                }}
               >
                 <Icon size={19} />
                 <span>{categories[type].label}</span>
@@ -620,10 +224,9 @@ export default function App({
           })}
         </nav>
         <div className="sidebar-note">
-          <span className="tiny-flower">✳</span>
+          <span>✳</span>
           <p lang="ja">一日、ひとこと。</p>
-          <span>每天一点，慢慢积累。</span>
-          <div className="note-rule" />
+          <small>每天一点，慢慢积累。</small>
         </div>
         <div className="sidebar-bottom">
           <span className="signed-in-user" title={username}>
@@ -634,62 +237,69 @@ export default function App({
             aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
             onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
           >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            {theme === 'light' ? <Moon size={19} /> : <Sun size={19} />}
           </button>
         </div>
       </aside>
       <div className="main-shell">
-        <header className="topbar">
+        <header className="app-header">
+          <button className="mobile-brand" aria-label="返回书库首页" onClick={showLibrary}>
+            <img src="/icons/icon-192.png" width="34" height="36" alt="" />
+            <span lang="ja">
+              ことば<small>日语笔记</small>
+            </span>
+          </button>
           <div className="breadcrumb">
-            <Library size={17} />
+            <Library size={18} />
             <span>书库</span>
-            <ChevronRight size={13} />
+            <ChevronRight size={14} />
             <strong>{category === 'all' ? '全部笔记' : categories[category].label}</strong>
           </div>
-          <div className="topbar-actions">
-            <span className="topbar-date">{date}</span>
+          <div className="header-actions">
+            <button className="icon-button header-search" aria-label="搜索" onClick={showSearch}>
+              <Search size={21} />
+            </button>
+            <button className="primary-button desktop-import" onClick={() => setImportOpen(true)}>
+              <Plus size={17} /> 导入笔记
+            </button>
+            <button
+              className="icon-button mobile-theme"
+              aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            >
+              {theme === 'light' ? <Moon size={21} /> : <Sun size={21} />}
+            </button>
             <button
               className="icon-button"
               aria-label="退出登录"
               disabled={logoutBusy}
-              onClick={() => void handleLogout()}
+              onClick={() => void logout()}
             >
-              <LogOut size={19} />
-            </button>
-            <button className="primary-button" onClick={() => setImportOpen(true)}>
-              <Plus size={17} /> 导入笔记
+              <LogOut size={20} />
             </button>
           </div>
         </header>
         <main className="main-content">
-          <section className="mobile-search-title" aria-label="搜索页面">
-            <h1>搜索</h1>
-            <p>在收藏里，找回那个表达。</p>
-          </section>
           <section className="intro">
             <div>
               <p className="eyebrow">A LITTLE JAPANESE, EVERY DAY</p>
               <h1>
-                我的书库<span>。</span>
+                {tab === 'search' ? '搜索' : '我的书库'}
+                <span>。</span>
               </h1>
-              <p className="intro-description">收藏每一次相遇，让日语慢慢成为日常。</p>
+              <p className="intro-description">
+                {tab === 'search'
+                  ? '在收藏里，找回那个表达。'
+                  : '收藏每一次相遇，让日语慢慢成为日常。'}
+              </p>
             </div>
-            <div className="intro-seal" aria-hidden="true">
-              <span lang="ja">
-                日々の
-                <br />
-                ことば
-              </span>
-              <span>WORDS TO KEEP</span>
-            </div>
+            <span className="intro-mark" lang="ja" aria-hidden="true">
+              日々の
+              <br />
+              ことば
+            </span>
           </section>
-          <section className="collection-section" aria-labelledby="collections-title">
-            <div className="section-heading">
-              <h2 id="collections-title">
-                笔记集 <span>COLLECTIONS</span>
-              </h2>
-              <span className="muted">三个角度，一点一滴。</span>
-            </div>
+          <section className="collection-section" aria-label="笔记集">
             <div className="collections-grid">
               {NOTE_TYPES.map((type) => (
                 <BookCover
@@ -697,35 +307,17 @@ export default function App({
                   type={type}
                   count={data.counts[type]}
                   active={category === type}
-                  onClick={() => selectCategory(type, true)}
+                  onClick={() => selectCategory(type)}
                 />
               ))}
             </div>
           </section>
-          <section
-            id="notes"
-            ref={notesRef}
-            className="notes-section"
-            aria-labelledby="notes-title"
-          >
+          <section className="notes-section" aria-labelledby="notes-title">
             <div className="notes-heading">
-              <div>
-                <h2 id="notes-title">
-                  {query
-                    ? '搜索结果'
-                    : category === 'all'
-                      ? '所有笔记'
-                      : categories[category].label}
-                  <span className="count-pill">{data.total}</span>
-                </h2>
-                <p>
-                  {query
-                    ? `与「${query}」有关的收藏`
-                    : category === 'all'
-                      ? '翻开一页，遇见新的表达。'
-                      : categories[category].description}
-                </p>
-              </div>
+              <h2 id="notes-title">
+                {query ? '搜索结果' : category === 'all' ? '所有笔记' : categories[category].label}
+                <span className="count-pill">{data.total}</span>
+              </h2>
               <div className="view-switch" aria-label="笔记显示方式">
                 <button
                   aria-label="卡片视图"
@@ -744,32 +336,6 @@ export default function App({
                   <List size={19} />
                 </button>
               </div>
-            </div>
-            <div className="filter-toolbar">
-              <div className="search-box">
-                <Search size={17} />
-                <input
-                  ref={searchRef}
-                  aria-label="搜索笔记"
-                  type="search"
-                  enterKeyHint="search"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  placeholder="搜索词条、释义…"
-                  value={search}
-                  maxLength={200}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-                {search && (
-                  <button
-                    className="clear-search"
-                    aria-label="清空搜索"
-                    onClick={() => setSearch('')}
-                  >
-                    <X size={15} />
-                  </button>
-                )}
-              </div>
               <label className="sort-select">
                 <span className="visually-hidden">排序方式</span>
                 <select
@@ -784,6 +350,33 @@ export default function App({
                   <option value="term">按词条排序</option>
                 </select>
               </label>
+            </div>
+            <div className="search-box">
+              <Search size={18} />
+              <input
+                ref={searchRef}
+                aria-label="搜索笔记"
+                type="search"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                }}
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCapitalize="none"
+                placeholder="搜索词条、释义…"
+                maxLength={200}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+              {search && (
+                <button
+                  className="clear-search icon-button"
+                  aria-label="清空搜索"
+                  onClick={() => setSearch('')}
+                >
+                  <X size={17} />
+                </button>
+              )}
             </div>
             <div className="category-tabs" aria-label="筛选笔记">
               <button
@@ -804,124 +397,119 @@ export default function App({
                 </button>
               ))}
             </div>
-            {error ? (
-              <div className="empty-state" role="alert">
-                <BookOpen size={30} />
-                <h3>书库暂时没有打开</h3>
-                <p>{error}</p>
-                <button className="secondary-button" onClick={() => setRefresh(refresh + 1)}>
-                  重新加载
-                </button>
-              </div>
-            ) : loading ? (
-              <div className="notes-grid" role="status" aria-label="正在加载笔记">
-                {[0, 1, 2].map((i) => (
-                  <div className="skeleton" key={i}>
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                ))}
-              </div>
-            ) : data.notes.length ? (
-              <div className={`notes-grid ${view === 'list' ? 'list-view' : ''}`}>
-                {data.notes.map((note, index) => (
-                  <button
-                    key={note.id}
-                    className={`note-card ${note.type}`}
-                    onClick={() => setReader({ notes: data.notes, index })}
-                    aria-label={`阅读：${note.term}`}
-                  >
-                    <div className="note-card-top">
-                      <span className={`type-badge ${note.type}`}>
-                        {categories[note.type].label}
-                      </span>
-                      <ArrowRight size={16} />
-                    </div>
-                    <NoteContent note={note} />
-                    <div className="note-card-footer">
-                      <span>打开笔记</span>
-                      <span aria-hidden="true">↗</span>
-                    </div>
+            <div
+              ref={shelf.ref}
+              className={`shelf-viewport ${view === 'list' ? 'list-mode' : ''}`}
+              {...swipe.handlers}
+            >
+              {error ? (
+                <div className="empty-state" role="alert">
+                  <BookOpen size={30} />
+                  <h3>书库暂时没有打开</h3>
+                  <p>{error}</p>
+                  <button className="secondary-button" onClick={() => setRefresh(refresh + 1)}>
+                    重新加载
                   </button>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <Search size={30} />
-                <h3>{query ? '还没有遇见这个表达' : '你的下一页，从这里开始'}</h3>
-                <p>
-                  {query
-                    ? '换一个词，或清空搜索再看看。'
-                    : '导入一些笔记，把新学到的日语收藏起来。'}
-                </p>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    if (query) setSearch('');
-                    else setImportOpen(true);
-                  }}
+                </div>
+              ) : loading ? (
+                <div className="shelf-loading" role="status" aria-label="正在加载笔记">
+                  <LoaderCircle className="spin" size={26} />
+                </div>
+              ) : data.notes.length ? (
+                <div
+                  key={`${data.page}-${category}-${query}-${view}`}
+                  className={`notes-grid ${view === 'list' ? 'list-view' : ''} ${pageDirection === -1 ? 'page-backward' : 'page-forward'}`}
+                  style={{ gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}
                 >
-                  {query ? '清空搜索' : '导入第一批笔记'}
-                </button>
-              </div>
-            )}
-            {!error && !loading && data.total > 0 && (
-              <div className="pagination">
+                  {data.notes.map((note, index) => (
+                    <button
+                      key={note.id}
+                      className={`note-card ${note.type}`}
+                      onClick={() => openReader(note, index)}
+                      aria-label={`阅读：${note.term}`}
+                    >
+                      {note.type !== 'word' && (
+                        <div className="note-card-top">
+                          <span className={`type-badge ${note.type}`}>
+                            {categories[note.type].label}
+                          </span>
+                          <ArrowRight size={16} />
+                        </div>
+                      )}
+                      <div className="note-card-content">
+                        <NoteContent note={note} />
+                      </div>
+                      <div className="note-card-footer">
+                        <span>打开笔记</span>
+                        <span aria-hidden="true">↗</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <Search size={28} />
+                  <h3>{query ? '还没有遇见这个表达' : '你的下一页，从这里开始'}</h3>
+                  <p>
+                    {query
+                      ? '换一个词，或清空搜索再看看。'
+                      : '导入一些笔记，把新学到的日语收藏起来。'}
+                  </p>
+                  <button
+                    className="secondary-button"
+                    onClick={() => (query ? setSearch('') : setImportOpen(true))}
+                  >
+                    {query ? '清空搜索' : '导入第一批笔记'}
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="pagination">
+              <button
+                className="icon-button"
+                aria-label="上一页"
+                disabled={page === 1 || loading}
+                onClick={() => turnShelf(-1)}
+              >
+                <ChevronLeft size={21} />
+              </button>
+              <div aria-live="polite">
                 <span>
-                  第 {(page - 1) * data.pageSize + 1}–{Math.min(page * data.pageSize, data.total)}{' '}
-                  条，共 {data.total} 条
+                  {page} / {pageCount}
                 </span>
-                {pageCount > 1 && (
-                  <div>
-                    <button
-                      className="icon-button"
-                      aria-label="上一页"
-                      disabled={page === 1}
-                      onClick={() => setPage(page - 1)}
-                    >
-                      <ChevronLeft size={18} />
-                    </button>
-                    <span>
-                      {page} / {pageCount}
-                    </span>
-                    <button
-                      className="icon-button"
-                      aria-label="下一页"
-                      disabled={page === pageCount}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
-                )}
+                <small>
+                  {data.total
+                    ? `第 ${(page - 1) * shelf.pageSize + 1}–${Math.min(page * shelf.pageSize, data.total)} 条 · 共 ${data.total} 条`
+                    : '等待新的一页'}
+                </small>
               </div>
-            )}
+              <button
+                className="icon-button"
+                aria-label="下一页"
+                disabled={page >= pageCount || loading}
+                onClick={() => turnShelf(1)}
+              >
+                <ChevronRight size={21} />
+              </button>
+            </div>
           </section>
-          <footer className="page-footer">
-            <span>
-              <BookOpen size={15} /> ことば <i>·</i> 日语笔记
-            </span>
-            <span>积累的每一页，都算数。</span>
-            <Sparkles size={16} />
-          </footer>
         </main>
       </div>
       <nav className="mobile-tabbar" aria-label="主导航">
         <button
           aria-label="书库"
-          aria-current={mobileTab === 'library' && !importOpen ? 'page' : undefined}
+          aria-current={tab === 'library' && !importOpen ? 'page' : undefined}
           onClick={showLibrary}
         >
-          <Library size={24} strokeWidth={1.7} />
+          <Library size={23} />
           <span>书库</span>
         </button>
         <button
           aria-label="搜索"
-          aria-current={mobileTab === 'search' && !importOpen ? 'page' : undefined}
+          aria-current={tab === 'search' && !importOpen ? 'page' : undefined}
           onClick={showSearch}
         >
-          <Search size={24} strokeWidth={1.7} />
+          <Search size={23} />
           <span>搜索</span>
         </button>
         <button
@@ -930,33 +518,35 @@ export default function App({
           aria-expanded={importOpen}
           onClick={() => setImportOpen(true)}
         >
-          <Plus size={25} strokeWidth={1.7} />
+          <Plus size={24} />
           <span>导入</span>
         </button>
       </nav>
+      {reader && (
+        <Reader
+          initialNote={reader.note}
+          initialIndex={reader.index}
+          source={reader.source}
+          historyKey={reader.historyKey}
+          close={closeReader}
+        />
+      )}
       {importOpen && (
         <Importer
           close={() => setImportOpen(false)}
           onImported={(message) => {
             setToast(message);
-            setMobileTab('library');
-            setSearch('');
-            setQuery('');
-            setCategory('all');
-            setPage(1);
+            showLibrary();
             setRefresh((value) => value + 1);
           }}
         />
-      )}
-      {reader && (
-        <Reader notes={reader.notes} initial={reader.index} close={() => setReader(null)} />
       )}
       {toast && (
         <div className="toast" role="status">
           <Check size={18} />
           <span>{toast}</span>
-          <button aria-label="关闭提示" onClick={() => setToast('')}>
-            <X size={16} />
+          <button className="icon-button" aria-label="关闭提示" onClick={() => setToast('')}>
+            <X size={17} />
           </button>
         </div>
       )}

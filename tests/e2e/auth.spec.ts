@@ -4,7 +4,7 @@ async function signIn(page: import('@playwright/test').Page) {
   await page.getByLabel('账号', { exact: true }).fill('e2e-reader');
   await page.getByLabel('密码', { exact: true }).fill('e2e-test-password');
   await page.getByRole('button', { name: '登录书库', exact: true }).click();
-  await expect(page.getByRole('button', { name: '阅读：多彩', exact: true })).toBeVisible();
+  await expect(page.locator('.note-card').first()).toBeVisible();
 }
 
 for (const width of [320, 393, 430]) {
@@ -46,7 +46,7 @@ for (const width of [320, 393, 430]) {
     await expect(password).toHaveValue('');
     await signIn(page);
     await page.reload();
-    await expect(page.getByRole('button', { name: '阅读：多彩', exact: true })).toBeVisible();
+    await expect(page.locator('.note-card').first()).toBeVisible();
     expect(
       (await context.cookies()).find((cookie) => cookie.name === 'kotoba_session_dev')?.httpOnly,
     ).toBe(true);
