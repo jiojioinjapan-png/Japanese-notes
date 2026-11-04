@@ -118,7 +118,7 @@ japanese-notes-db
 
 Cloudflare 会根据 `package-lock.json` 安装依赖。`npm run deploy` 会先对远程 D1 应用尚未执行的迁移，再部署 Worker 与前端文件。每次推送 `main` 都会重新执行这个流程。
 
-构建使用的 Cloudflare API token 需要目标账户的 **D1 Edit**、**Workers Scripts Edit** 和 **Workers R2 Storage Edit** 权限；如果迁移出现权限错误，在 Worker 的 **Settings → Build → API token** 中选择具有这些权限的 token。
+使用 Cloudflare 的 GitHub 自动部署时，Cloudflare 会自动创建并管理构建凭据，默认包含 Workers 和 R2 权限，无需自己创建 R2 API Token 或配置 Access Key。只有构建日志出现 D1 / R2 权限错误时，才需要在 Worker 的 **Settings → Build → API token** 检查自动生成或所选令牌的资源权限；数据库迁移需要 D1 编辑权限。[Cloudflare 构建凭据说明](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token)。
 
 此配置连接生产 D1。先仅启用 `main` 的生产部署；如果要开启其他分支的预览，请为预览单独配置 Worker / D1，以免预览使用生产数据。
 
@@ -164,21 +164,21 @@ Cloudflare 会根据 `package-lock.json` 安装依赖。`npm run deploy` 会先�
 ### 首次配置 R2
 
 1. 在 Cloudflare 控制台打开 **R2 object storage**。若尚未启用 R2，先按控制台提示启用。
-2. 创建名为 **`japanese-notes-audio`** 的存储桶，保持私有。也可使用 CLI：
+2. 创建名为 **`notes-audio`** 的存储桶，保持私有；已有同名桶时直接使用，无需再创建。也可使用 CLI：
 
    ```bash
-   npx wrangler r2 bucket create japanese-notes-audio
+   npx wrangler r2 bucket create notes-audio
    ```
 
-3. 仓库的 `wrangler.jsonc` 已声明绑定，无需手动改代码：
+3. 仓库的 `wrangler.jsonc` 已声明绑定。GitHub 自动部署成功后会将 Worker 的 `AUDIO` 变量绑定到 `notes-audio`，无需在控制台重复手动绑定：
 
    ```jsonc
    "r2_buckets": [
-     { "binding": "AUDIO", "bucket_name": "japanese-notes-audio" }
+     { "binding": "AUDIO", "bucket_name": "notes-audio" }
    ]
    ```
 
-4. 为 **Worker 构建使用的 Cloudflare API Token** 增加目标账户的 **Workers R2 Storage Edit** 权限，并保留现有 D1、Workers 部署权限。然后重新部署最新 GitHub 提交。若 R2 已启用且构建令牌允许创建资源，当前 Wrangler 也支持在首次部署时自动创建声明的桶；手动提前创建更便于核对。
+4. 等待最新 GitHub 提交自动部署成功，再到 **Worker → Bindings（绑定）** 核对：类型为 R2，变量名为 **`AUDIO`**，存储桶为 **`notes-audio`**。不需要额外创建 R2 API Token、填写 Access Key / Secret Key 或修改登录环境变量。Cloudflare 管理的构建凭据默认已包含 R2 权限；只有部署日志明确报权限错误时，才需要检查 **Settings → Build → API token**。
 
 音频缓存属于线上 R2；本地 `wrangler dev` 使用 `.wrangler/` 中的隔离模拟存储。服务器测试使用独立的本地 D1 / R2，不会访问生产数据。已有笔记会通过新增的 `0003_note_revisions.sql` 自动补上版本字段，不会清空数据，部署命令继续使用 `npm run deploy`。
 
