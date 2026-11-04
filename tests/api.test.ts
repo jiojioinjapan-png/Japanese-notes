@@ -2,7 +2,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { build } from 'esbuild';
 import { readFile } from 'node:fs/promises';
-import { exampleImport } from '../shared/notes';
+import { exampleImport, type Note, type NoteUpdateResponse } from '../shared/notes';
+import { speechResponse, speechKey } from '../worker/speech';
+import { vi } from 'vitest';
 import worker, { type Env } from '../worker/index';
 
 let mf: Miniflare;
@@ -55,11 +57,16 @@ beforeAll(async () => {
       script: built.outputFiles[0].text,
       compatibilityDate: '2025-11-01',
       d1Databases: ['DB'],
+      r2Buckets: ['AUDIO'],
       bindings: { LOGIN_USERNAME: username, LOGIN_PASSWORD: password },
     }),
   );
   db = await mf.getD1Database('DB');
-  for (const file of ['0001_create_notes.sql', '0002_authentication.sql']) {
+  for (const file of [
+    '0001_create_notes.sql',
+    '0002_authentication.sql',
+    '0003_note_revisions.sql',
+  ]) {
     const migration = await readFile(`migrations/${file}`, 'utf8');
     const statements = migration
       .replace(/--[^\n]*/g, '')
@@ -154,12 +161,206 @@ describe('Worker with a real local D1 database', () => {
         })
       ).json(),
     ).toMatchObject({ inserted: 0, skipped: 2 });
-    const roundTrip = listing.notes.map(({ id: _id, createdAt: _createdAt, ...note }) => note);
+    const roundTrip = listing.notes.map(
+      ({ id: _id, createdAt: _createdAt, revision: _revision, ...note }) => note,
+    );
     expect(await (await upload({ notes: roundTrip })).json()).toMatchObject({
       inserted: 0,
       skipped: 5,
     });
     expect(await count()).toBe(5);
+  });
+  it('edits all fields, preserves identity, recalculates positions, and prevents stale overwrites', async () => {
+    await upload({
+      notes: [
+        { type: 'word', term: 'a', meaning: 'first' },
+        { type: 'word', term: 'b', meaning: 'second' },
+      ],
+    });
+    const listing = (await (await request('/api/notes?sort=term')).json()) as { notes: Note[] };
+    const original = listing.notes[0];
+    const changed = {
+      type: 'word',
+      term: 'z',
+      reading: 'ぜっと',
+      accent: 0,
+      partOfSpeech: '',
+      meaning: null,
+      example: '新しい例文です。',
+      exampleTranslation: '新的例句。',
+    };
+    const update = (revision: number, note = changed) =>
+      request(`/api/notes/${original.id}?sort=term&category=word`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ revision, note }),
+      });
+    const response = await update(original.revision);
+    expect(response.status).toBe(200);
+    const result = (await response.json()) as NoteUpdateResponse;
+    expect(result.note).toMatchObject({
+      id: original.id,
+      createdAt: original.createdAt,
+      term: 'z',
+      accent: 0,
+      revision: 1,
+      meaning: '',
+    });
+    expect(result.note).not.toHaveProperty('partOfSpeech');
+    expect(result.context).toEqual({ index: 1, total: 2 });
+    const conflict = await update(0);
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({
+      code: 'NOTE_CHANGED',
+      note: { term: 'z', revision: 1 },
+    });
+    const moved = await update(1, { ...changed, type: 'grammar' });
+    expect(await moved.json()).toMatchObject({
+      note: { type: 'grammar', revision: 2 },
+      context: { index: null, total: 1 },
+    });
+  });
+  it('rejects duplicate, invalid, cross-site, and unauthenticated edits without changing stored content', async () => {
+    await upload({
+      notes: [
+        { type: 'word', term: 'a' },
+        { type: 'word', term: 'b' },
+      ],
+    });
+    const listing = (await (await request('/api/notes?sort=term')).json()) as { notes: Note[] };
+    const id = listing.notes[0].id;
+    const body = JSON.stringify({ revision: 0, note: { type: 'word', term: 'b' } });
+    expect((await request(`/api/notes/${id}`, { method: 'PUT', headers, body })).status).toBe(409);
+    expect(
+      (
+        await request(`/api/notes/${id}`, {
+          method: 'PUT',
+          headers: { ...headers, Origin: 'https://other.example' },
+          body,
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (await request(`/api/notes/${id}`, { method: 'PUT', headers, body }, false)).status,
+    ).toBe(401);
+    expect(
+      (
+        await request(`/api/notes/${id}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ revision: 0, note: { type: 'word', term: '' } }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      await db.prepare('SELECT term, revision FROM notes WHERE id = ?').bind(id).first(),
+    ).toEqual({ term: 'a', revision: 0 });
+  });
+  it('stores generated speech in real R2, serves iPhone ranges, and changes cache keys only when the spoken content changes', async () => {
+    await upload({ notes: [{ type: 'grammar', term: '音声', example: '今日はいい天気です。' }] });
+    const listing = (await (await request('/api/notes')).json()) as { notes: Note[] };
+    const note = listing.notes[0];
+    const AUDIO = await mf.getR2Bucket('AUDIO');
+    const text = note.example!;
+    const key = await speechKey(text);
+    await AUDIO.delete(key);
+    const generate = vi.fn(async () => new Uint8Array([255, 243, 1, 2, 3]));
+    const env = { DB: db, AUDIO } as unknown as Env;
+    const url = `http://localhost/api/notes/${note.id}/audio?revision=0`;
+    const [first, concurrent] = await Promise.all([
+      speechResponse(new Request(url), env, note.id, generate),
+      speechResponse(new Request(url), env, note.id, generate),
+    ]);
+    expect(first.status).toBe(200);
+    expect(concurrent.status).toBe(200);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect((await AUDIO.get(key))!.size).toBe(5);
+    const cached = await speechResponse(
+      new Request(url, { headers: { Range: 'bytes=1-3' } }),
+      env,
+      note.id,
+      generate,
+    );
+    expect(cached.status).toBe(206);
+    expect(cached.headers.get('Content-Range')).toBe('bytes 1-3/5');
+    expect(cached.headers.get('X-Audio-Cache')).toBe('HIT');
+    expect(new Uint8Array(await cached.arrayBuffer())).toEqual(new Uint8Array([243, 1, 2]));
+    expect(
+      (
+        await speechResponse(
+          new Request(url, { headers: { Range: 'bytes=99-' } }),
+          env,
+          note.id,
+          generate,
+        )
+      ).status,
+    ).toBe(416);
+    await db
+      .prepare('UPDATE notes SET meaning = ?, revision = 1 WHERE id = ?')
+      .bind('只改释义', note.id)
+      .run();
+    expect(
+      (
+        await speechResponse(
+          new Request(url.replace('revision=0', 'revision=1')),
+          env,
+          note.id,
+          generate,
+        )
+      ).status,
+    ).toBe(200);
+    expect(generate).toHaveBeenCalledTimes(1);
+    await db
+      .prepare('UPDATE notes SET example = ?, revision = 2 WHERE id = ?')
+      .bind('別の例文です。', note.id)
+      .run();
+    expect((await speechResponse(new Request(url), env, note.id, generate)).status).toBe(409);
+    expect(
+      (
+        await speechResponse(
+          new Request(url.replace('revision=0', 'revision=2')),
+          env,
+          note.id,
+          generate,
+        )
+      ).status,
+    ).toBe(200);
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect((await request(`/api/notes/${note.id}/audio?revision=2`, undefined, false)).status).toBe(
+      401,
+    );
+  });
+  it('never caches failed speech generation and supports retry', async () => {
+    await upload({ notes: [{ type: 'word', term: '失敗', example: '発音の再試行です。' }] });
+    const listing = (await (await request('/api/notes')).json()) as { notes: Note[] };
+    const note = listing.notes[0];
+    const AUDIO = await mf.getR2Bucket('AUDIO');
+    const key = await speechKey(note.example!);
+    await AUDIO.delete(key);
+    const env = { DB: db, AUDIO } as unknown as Env;
+    const speechRequest = () =>
+      new Request(`http://localhost/api/notes/${note.id}/audio?revision=0`);
+    expect(
+      (await speechResponse(speechRequest(), { DB: db } as unknown as Env, note.id)).status,
+    ).toBe(503);
+    expect(
+      (
+        await speechResponse(speechRequest(), env, note.id, async () => {
+          throw new Error('test upstream failure');
+        })
+      ).status,
+    ).toBe(502);
+    expect(await AUDIO.head(key)).toBe(null);
+    expect(
+      (
+        await speechResponse(
+          speechRequest(),
+          env,
+          note.id,
+          async () => new Uint8Array([255, 243, 0]),
+        )
+      ).status,
+    ).toBe(200);
   });
   it('rejects invalid batches without inserting the valid first row', async () => {
     const response = await upload({

@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, LoaderCircle, Type, X } from 'lucide-react';
-import { categories, type Category, type Note, type NotesResponse } from '../../shared/notes';
+import { ArrowLeft, ChevronLeft, ChevronRight, LoaderCircle, Pencil, Type, X } from 'lucide-react';
+import {
+  categories,
+  type Category,
+  type Note,
+  type NotesResponse,
+  type NoteUpdateResponse,
+} from '../../shared/notes';
 import { responseBody } from '../api';
 import { usePreference } from '../preferences';
 import { useSwipe } from '../useSwipe';
 import Modal from './Modal';
 import NoteContent from './NoteContent';
+import NoteEditor from './NoteEditor';
 
 export type ReaderSource = { category: Category; query: string; sort: string; total: number };
 export default function Reader({
   initialNote,
   initialIndex,
-  source,
+  source: initialSource,
   historyKey,
   returnLabel = '返回书库',
+  onUpdated,
   close,
 }: {
   initialNote: Note;
@@ -21,8 +29,13 @@ export default function Reader({
   source: ReaderSource;
   historyKey: string;
   returnLabel?: string;
+  onUpdated?: (note: Note) => void;
   close: (position: number) => void;
 }) {
+  const [source, setSource] = useState(initialSource);
+  const [editor, setEditor] = useState<string | null>(null);
+  const saving = useRef(false);
+  const [notice, setNotice] = useState('');
   const [index, setIndex] = useState(initialIndex);
   const [note, setNote] = useState(initialNote);
   const [readerSize, setReaderSize] = usePreference('kotoba-reader-size', 'regular');
@@ -59,15 +72,19 @@ export default function Reader({
         page: String(target + 1),
         pageSize: '1',
       });
-      const request = fetch(`/api/notes?${params}`, { signal: controller.current.signal })
+      const signal = controller.current.signal;
+      const request = fetch(`/api/notes?${params}`, { signal })
         .then(responseBody<NotesResponse>)
         .then((result) => {
+          if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
           if (!result.notes[0]) throw new Error('这一页暂时没有内容，请返回书库刷新。');
           cache.current.set(target, result.notes[0]);
           if (!controller.current.signal.aborted) redrawCache((value) => value + 1);
           return result.notes[0];
         })
-        .finally(() => pending.current.delete(target));
+        .finally(() => {
+          if (pending.current.get(target) === request) pending.current.delete(target);
+        });
       pending.current.set(target, request);
       return request;
     },
@@ -100,13 +117,14 @@ export default function Reader({
   const turn = useCallback(
     async (step: -1 | 1) => {
       const target = position.current + step;
-      if (locked.current || target < 0 || target >= source.total) {
+      if (locked.current || saving.current || target < 0 || target >= source.total) {
         setDrag(0);
         setDirection(0);
         return;
       }
       locked.current = true;
       setError('');
+      setNotice('');
       try {
         if (!cache.current.has(target)) setLoading(true);
         const next = await load(target);
@@ -154,6 +172,7 @@ export default function Reader({
   );
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
+      if (editor) return;
       if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
         event.preventDefault();
         void turn(event.key === 'ArrowRight' ? 1 : -1);
@@ -161,12 +180,12 @@ export default function Reader({
     };
     window.addEventListener('keydown', keyboard);
     return () => window.removeEventListener('keydown', keyboard);
-  }, [turn]);
+  }, [turn, editor]);
   useLayoutEffect(() => {
     page.current?.scrollTo({ top: 0, behavior: 'instant' });
   }, [index]);
   const swipe = useSwipe({
-    disabled: turning || loading,
+    disabled: turning || loading || !!editor,
     canPrevious: index > 0,
     canNext: index < source.total - 1,
     onTurn: (step) => void turn(step),
@@ -181,110 +200,171 @@ export default function Reader({
       }
     },
   });
+  useEffect(() => {
+    if (!editor) return;
+    const back = () => {
+      if (history.state?.kotobaEditor !== editor && !saving.current) setEditor(null);
+    };
+    window.addEventListener('popstate', back);
+    return () => window.removeEventListener('popstate', back);
+  }, [editor]);
+  function openEditor() {
+    const key = crypto.randomUUID();
+    history.pushState({ ...history.state, kotobaEditor: key }, '');
+    setEditor(key);
+  }
+  function closeEditor() {
+    const key = editor;
+    setEditor(null);
+    if (key && history.state?.kotobaEditor === key) history.back();
+  }
+  function saved(result: NoteUpdateResponse) {
+    controller.current.abort();
+    controller.current = new AbortController();
+    pending.current.clear();
+    const nextIndex = result.context.index ?? 0;
+    cache.current.clear();
+    cache.current.set(nextIndex, result.note);
+    position.current = nextIndex;
+    setIndex(nextIndex);
+    setSource({ ...source, total: result.context.index === null ? 1 : result.context.total });
+    setNote(result.note);
+    setNotice(
+      result.context.index === null ? '已保存，此词条已移出当前分类或搜索结果。' : '已保存',
+    );
+    onUpdated?.(result.note);
+    closeEditor();
+  }
   const width = stage.current?.clientWidth ?? window.innerWidth;
   const preview = direction ? cache.current.get(index + direction) : undefined;
   return (
-    <Modal
-      title="笔记阅读"
-      close={() => closeRef.current(position.current)}
-      className={`reader ${note.type} ${readerSize === 'large' ? 'large-text' : ''}`}
-    >
-      <header className="reader-toolbar">
-        <button className="text-button" onClick={() => close(position.current)}>
-          <ArrowLeft size={18} /> {returnLabel}
-        </button>
-        <div className="reader-actions">
-          <button
-            className="icon-button"
-            aria-label="切换阅读字号"
-            aria-pressed={readerSize === 'large'}
-            onClick={() => setReaderSize(readerSize === 'large' ? 'regular' : 'large')}
-          >
-            <Type size={21} />
-          </button>
-          <button
-            className="icon-button"
-            aria-label="关闭阅读"
-            onClick={() => close(position.current)}
-          >
-            <X size={21} />
-          </button>
-        </div>
-      </header>
-      <div
-        ref={stage}
-        className={`reader-stage ${turning ? 'is-turning' : ''} ${offset && !turning ? 'is-dragging' : ''}`}
-        {...swipe.handlers}
+    <>
+      <Modal
+        title="笔记阅读"
+        close={() => closeRef.current(position.current)}
+        className={`reader ${note.type} ${readerSize === 'large' ? 'large-text' : ''}`}
       >
-        <article
-          key={index}
-          ref={page}
-          className={`reader-page ${note.type}`}
-          tabIndex={-1}
-          data-dialog-focus
-          style={{
-            transform: `translate3d(${offset}px, 0, 0) rotateY(${offset ? (offset / width) * -3 : 0}deg)`,
-          }}
-        >
-          <span className={`type-badge ${note.type}`}>{categories[note.type].label}</span>
-          <NoteContent note={note} full />
-          <div className="reader-end" aria-hidden="true">
-            ✳
+        <header className="reader-toolbar">
+          <button className="text-button" onClick={() => close(position.current)}>
+            <ArrowLeft size={18} /> {returnLabel}
+          </button>
+          <div className="reader-actions">
+            <button
+              className="icon-button"
+              aria-label="编辑词条"
+              disabled={turning || loading}
+              onClick={openEditor}
+            >
+              <Pencil size={20} />
+            </button>
+            <button
+              className="icon-button"
+              aria-label="切换阅读字号"
+              aria-pressed={readerSize === 'large'}
+              onClick={() => setReaderSize(readerSize === 'large' ? 'regular' : 'large')}
+            >
+              <Type size={21} />
+            </button>
+            <button
+              className="icon-button"
+              aria-label="关闭阅读"
+              onClick={() => close(position.current)}
+            >
+              <X size={21} />
+            </button>
           </div>
-        </article>
-        {direction !== 0 && (
-          <div
-            className={`reader-turn-preview ${preview?.type ?? note.type}`}
-            aria-hidden="true"
-            style={{ transform: `translate3d(${direction * width + offset}px, 0, 0)` }}
+        </header>
+        <div
+          ref={stage}
+          className={`reader-stage ${turning ? 'is-turning' : ''} ${offset && !turning ? 'is-dragging' : ''}`}
+          {...swipe.handlers}
+        >
+          <article
+            key={index}
+            ref={page}
+            className={`reader-page ${note.type}`}
+            tabIndex={-1}
+            data-dialog-focus
+            style={{
+              transform: `translate3d(${offset}px, 0, 0) rotateY(${offset ? (offset / width) * -3 : 0}deg)`,
+            }}
           >
-            {preview ? (
-              <>
-                <span className={`type-badge ${preview.type}`}>
-                  {categories[preview.type].label}
-                </span>
-                <NoteContent note={preview} full />
-              </>
-            ) : (
-              <LoaderCircle className="spin" size={24} />
-            )}
-          </div>
-        )}
-        {loading && (
-          <div className="reader-loading" role="status">
-            <LoaderCircle className="spin" size={20} /> 正在翻页…
-          </div>
-        )}
-      </div>
-      {error && (
-        <p className="reader-error" role="alert">
-          {error}
-        </p>
-      )}
-      <footer className="reader-footer">
-        <button
-          className="icon-button"
-          aria-label="上一篇"
-          disabled={index === 0 || turning || loading}
-          onClick={() => void turn(-1)}
-        >
-          <ChevronLeft size={23} />
-        </button>
-        <div className="reader-position" aria-live="polite">
-          <span>
-            {index + 1} / {source.total}
-          </span>
-          <small>左右滑动翻页</small>
+            <span className={`type-badge ${note.type}`}>{categories[note.type].label}</span>
+            <NoteContent note={note} full playable={!editor && !turning} />
+            <div className="reader-end" aria-hidden="true">
+              ✳
+            </div>
+          </article>
+          {direction !== 0 && (
+            <div
+              className={`reader-turn-preview ${preview?.type ?? note.type}`}
+              aria-hidden="true"
+              style={{ transform: `translate3d(${direction * width + offset}px, 0, 0)` }}
+            >
+              {preview ? (
+                <>
+                  <span className={`type-badge ${preview.type}`}>
+                    {categories[preview.type].label}
+                  </span>
+                  <NoteContent note={preview} full />
+                </>
+              ) : (
+                <LoaderCircle className="spin" size={24} />
+              )}
+            </div>
+          )}
+          {loading && (
+            <div className="reader-loading" role="status">
+              <LoaderCircle className="spin" size={20} /> 正在翻页…
+            </div>
+          )}
         </div>
-        <button
-          className="icon-button"
-          aria-label="下一篇"
-          disabled={index === source.total - 1 || turning || loading}
-          onClick={() => void turn(1)}
-        >
-          <ChevronRight size={23} />
-        </button>
-      </footer>
-    </Modal>
+        {error && (
+          <p className="reader-error" role="alert">
+            {error}
+          </p>
+        )}
+        {notice && (
+          <p className="reader-notice" role="status">
+            {notice}
+          </p>
+        )}
+        <footer className="reader-footer">
+          <button
+            className="icon-button"
+            aria-label="上一篇"
+            disabled={index === 0 || turning || loading}
+            onClick={() => void turn(-1)}
+          >
+            <ChevronLeft size={23} />
+          </button>
+          <div className="reader-position" aria-live="polite">
+            <span>
+              {index + 1} / {source.total}
+            </span>
+            <small>左右滑动翻页</small>
+          </div>
+          <button
+            className="icon-button"
+            aria-label="下一篇"
+            disabled={index === source.total - 1 || turning || loading}
+            onClick={() => void turn(1)}
+          >
+            <ChevronRight size={23} />
+          </button>
+        </footer>
+      </Modal>
+      {editor && (
+        <NoteEditor
+          note={note}
+          source={source}
+          close={closeEditor}
+          onSaved={saved}
+          onBusy={(value) => {
+            saving.current = value;
+          }}
+        />
+      )}
+    </>
   );
 }

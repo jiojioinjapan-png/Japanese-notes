@@ -9,7 +9,12 @@ export default defineConfig({
     { name: 'chromium', testIgnore: '**/iphone.spec.ts', use: { ...devices['Desktop Chrome'] } },
     {
       name: 'iphone-webkit',
-      testMatch: ['**/iphone.spec.ts', '**/auth.spec.ts', '**/collection.spec.ts'],
+      testMatch: [
+        '**/iphone.spec.ts',
+        '**/auth.spec.ts',
+        '**/collection.spec.ts',
+        '**/features.spec.ts',
+      ],
       use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
   ],

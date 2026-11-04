@@ -8,6 +8,9 @@ React + TypeScript + Vite 构建界面；Cloudflare Worker 提供 API 和静态�
 
 ## 已实现
 
+- **词条编辑**：在阅读页点击铅笔，修改所有字段并保存；可清空可选字段，列表和首页同步刷新。
+- **例句发音**：点击例句末尾的小喇叭，用 Edge TTS 生成日语音频并保存到私有 R2，之后复用缓存。
+- **列表字号**：预览列表顶部提供独立字号按钮，四档大小会自动调整行高和留白，并记住选择。
 - **账号登录**：账号与密码由 Cloudflare 运行时环境变量配置，登录后阅读与导入，支持退出和会话保留。
 - **单词**：词条、平假名读音、声调数字（含 `0` 调）、词性、中文释义，可选例句。
 - **拟声拟态词**：词条、中文释义、日语例句。
@@ -23,6 +26,8 @@ React + TypeScript + Vite 构建界面；Cloudflare Worker 提供 API 和静态�
 ## 单屏书库与滑动翻页
 
 点击首页的「单词 / 拟声拟态词 / 语法」书本，会先打开对应的预览列表：每行左侧为 `term`，右侧为 `meaning`，列表可上下滚动。长词条和释义显示摘要，点击一行查看完整内容；未填写释义时不生成占位内容。笔记较多时，滚动到底部会自动继续加载，也可点击「加载更多词条」。
+
+列表顶部的 `Aa` 字号按钮可展开「小 / 标准 / 大 / 特大」四档控制，字号、行高和留白同步调整。该设置在当前浏览器记忆，适用于三本书的预览列表，不影响阅读页、首页或编辑表单的字号。
 
 进入词条后，左滑下一条、右滑上一条，顺序沿用打开书本时的排序，且可以跨越列表加载批次。点击「返回预览列表」会保留原来的滚动位置。浏览器返回也按「词条 → 预览列表 → 首页」逐级返回。
 
@@ -113,7 +118,7 @@ japanese-notes-db
 
 Cloudflare 会根据 `package-lock.json` 安装依赖。`npm run deploy` 会先对远程 D1 应用尚未执行的迁移，再部署 Worker 与前端文件。每次推送 `main` 都会重新执行这个流程。
 
-构建使用的 Cloudflare API token 需要目标账户的 **D1 Edit** 和 **Workers Scripts Edit** 权限；如果迁移出现权限错误，在 Worker 的 **Settings → Build → API token** 中选择具有这些权限的 token。
+构建使用的 Cloudflare API token 需要目标账户的 **D1 Edit**、**Workers Scripts Edit** 和 **Workers R2 Storage Edit** 权限；如果迁移出现权限错误，在 Worker 的 **Settings → Build → API token** 中选择具有这些权限的 token。
 
 此配置连接生产 D1。先仅启用 `main` 的生产部署；如果要开启其他分支的预览，请为预览单独配置 Worker / D1，以免预览使用生产数据。
 
@@ -142,7 +147,42 @@ Cloudflare 会根据 `package-lock.json` 安装依赖。`npm run deploy` 会先�
 - 生产会话使用 `Secure`、`HttpOnly`、`SameSite=Lax` Cookie，D1 仅保存随机会话令牌的哈希与验证信息；账号密码不会发送进前端配置，也不会写入浏览器本地存储。
 - 同一 IP 在 15 分钟内连续尝试错误账号密码超过 10 次，会暂时限制登录，并返回 `429`。
 
-本次新增 [0002_authentication.sql](./migrations/0002_authentication.sql) 迁移。保持部署命令为 `npm run deploy`，会自动创建会话与登录次数记录表，已有笔记会保留。
+账号登录使用 [0002_authentication.sql](./migrations/0002_authentication.sql) 迁移。保持部署命令为 `npm run deploy`，会自动创建会话与登录次数记录表，已有笔记会保留。
+
+## 编辑词条与例句发音
+
+在词条阅读页点击右上角的铅笔按钮，修改分类、词条、平假名、声调、词性、中文释义、例句或译文，再点击「保存」。只有分类和词条必填。修改会写回原笔记，保留 ID 和首次添加时间；不会新增一条副本。
+
+保存后会更新当前词条、预览列表和首页。按词条排序时会重新计算阅读位置；如果修改分类或搜索字段使词条离开当前结果，当前页仍展示保存的内容，关闭后回到更新后的列表。多设备同时修改同一条笔记时会提示版本冲突，可选择「载入最新内容」后再编辑，避免覆盖另一处的修改。
+
+例句末尾的小喇叭用于播放日语例句，首次点击时由 Worker 连接 Edge TTS 生成 MP3，并保存到 R2。默认声音为 `ja-JP-NanamiNeural`。再次播放优先读取 R2，无需再次合成；相同例句可跨笔记复用音频。修改例句后自动使用新缓存，单纯修改释义或词性则继续复用原音频。翻页、关闭阅读或打开编辑时会停止播放；没有例句时不显示喇叭。
+
+音频通过已登录的 Worker 同源接口读取，R2 保持私有，不需要公开 `r2.dev`、自定义公开域名、浏览器 CORS 或额外的 Edge / Azure API 密钥。R2 返回支持字节范围的 MP3，以适配 iPhone Safari。发音依赖联网访问 Edge TTS；生成失败不会保存失败结果，可以点击重试。
+
+<img src="docs/iphone-editor.png" width="250" alt="iPhone 词条字段编辑" /> <img src="docs/iphone-speech.png" width="250" alt="例句末尾的发音按钮" /> <img src="docs/iphone-list-size.png" width="250" alt="独立的列表字号和行间距调整" />
+
+### 首次配置 R2
+
+1. 在 Cloudflare 控制台打开 **R2 object storage**。若尚未启用 R2，先按控制台提示启用。
+2. 创建名为 **`japanese-notes-audio`** 的存储桶，保持私有。也可使用 CLI：
+
+   ```bash
+   npx wrangler r2 bucket create japanese-notes-audio
+   ```
+
+3. 仓库的 `wrangler.jsonc` 已声明绑定，无需手动改代码：
+
+   ```jsonc
+   "r2_buckets": [
+     { "binding": "AUDIO", "bucket_name": "japanese-notes-audio" }
+   ]
+   ```
+
+4. 为 **Worker 构建使用的 Cloudflare API Token** 增加目标账户的 **Workers R2 Storage Edit** 权限，并保留现有 D1、Workers 部署权限。然后重新部署最新 GitHub 提交。若 R2 已启用且构建令牌允许创建资源，当前 Wrangler 也支持在首次部署时自动创建声明的桶；手动提前创建更便于核对。
+
+音频缓存属于线上 R2；本地 `wrangler dev` 使用 `.wrangler/` 中的隔离模拟存储。服务器测试使用独立的本地 D1 / R2，不会访问生产数据。已有笔记会通过新增的 `0003_note_revisions.sql` 自动补上版本字段，不会清空数据，部署命令继续使用 `npm run deploy`。
+
+参考：[Cloudflare R2 创建与绑定](https://developers.cloudflare.com/r2/get-started/workers-api/)、[Wrangler 自动创建资源](https://developers.cloudflare.com/changelog/post/2025-10-24-automatic-resource-provisioning/)、[Edge TTS 协议参考](https://github.com/SchneeHertz/node-edge-tts)。Worker 内的 v2 令牌算法改编自 MIT 许可的 `node-edge-tts`，保留了 [许可证](./worker/vendor/node-edge-tts.LICENSE)。
 
 ## JSON 导入格式
 
@@ -250,17 +290,19 @@ npx playwright install --with-deps chromium webkit
 npm run test:e2e
 ```
 
-集成测试在独立的 Miniflare D1 中验证实际 SQL、500 条导入、去重和事务回滚。浏览器测试会自动构建并启动本地 Worker，每次重建 `.wrangler/e2e` 的独立测试数据库，使用公开的测试专用账号密码，不影响开发 / 生产数据库。GitHub Actions 会自动运行测试与构建。
+集成测试在独立的 Miniflare D1 / R2 中验证实际 SQL、500 条导入、去重、编辑冲突、事务回滚、音频缓存和分段读取。浏览器测试使用随仓库提供的真实 MP3 样本验证播放，不依赖外部 TTS 在线状态。浏览器测试会自动构建并启动本地 Worker，每次重建 `.wrangler/e2e` 的独立测试数据库，使用公开的测试专用账号密码，不影响开发 / 生产数据库。GitHub Actions 会自动运行测试与构建。
 
 ## API
 
-| 请求                     | 用途                                                                     |
-| ------------------------ | ------------------------------------------------------------------------ |
-| `POST /api/auth/login`   | JSON `{ "username": "账号", "password": "密码" }`；成功后设置会话 Cookie |
-| `GET /api/auth/session`  | 检查会话；已登录时返回账号名，未登录时不泄露配置的账号                   |
-| `POST /api/auth/logout`  | 撤销当前会话并清除 Cookie                                                |
-| `GET /api/notes`         | **需登录**；分页读取笔记，并返回各分类总数                               |
-| `POST /api/notes/import` | **需登录**；批量导入，要求 `Content-Type: application/json`              |
+| 请求                                  | 用途                                                                                                        |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/login`                | JSON `{ "username": "账号", "password": "密码" }`；成功后设置会话 Cookie                                    |
+| `GET /api/auth/session`               | 检查会话；已登录时返回账号名，未登录时不泄露配置的账号                                                      |
+| `POST /api/auth/logout`               | 撤销当前会话并清除 Cookie                                                                                   |
+| `PUT /api/notes/:id`                  | **需登录**；JSON `{ "note": {"type":"word","term":"多彩"}, "revision": 0 }`，原位更新并返回新版本与阅读位置 |
+| `GET /api/notes/:id/audio?revision=0` | **需登录**；生成或复用 R2 中的例句 MP3，支持 Range 请求                                                     |
+| `GET /api/notes`                      | **需登录**；分页读取笔记，并返回各分类总数                                                                  |
+| `POST /api/notes/import`              | **需登录**；批量导入，要求 `Content-Type: application/json`                                                 |
 
 浏览器通过同源 HttpOnly Cookie 自动保持认证。脚本调用时，请先请求登录接口并保留返回的 Cookie，再请求笔记 API；旧的 Bearer 导入密钥不能代替登录。所有动态 API 响应均不缓存。
 
@@ -282,7 +324,9 @@ src/components/         书本预览列表、单词排版、纸页阅读器、�
 src/useShelfLayout.ts   按可用空间计算每页卡片数量
 src/useSwipe.ts         横向手势识别，保留纵向滚动和缩放
 shared/notes.ts          三类笔记的数据类型和前后端共享校验
-worker/index.ts         笔记 API、D1 查询与事务导入
+worker/index.ts         笔记 API、D1 查询、编辑与事务导入
+worker/speech.ts        私有 R2 音频缓存和分段读取
+worker/edge-tts.ts      Worker 原生 Edge TTS WebSocket 客户端
 worker/auth.ts          登录、会话撤销、环境变量校验与限流
 src/AuthGate.tsx        登录界面与会话状态管理
 migrations/             D1 数据库迁移与首次示例数据

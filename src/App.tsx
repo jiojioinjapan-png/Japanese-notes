@@ -104,6 +104,11 @@ export default function App({
       .then(responseBody<NotesResponse>)
       .then((result) => {
         if (!controller.signal.aborted) {
+          const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+          if (result.page > lastPage) {
+            setPage(lastPage);
+            return;
+          }
           setData(result);
           setLoading(false);
         }
@@ -183,6 +188,13 @@ export default function App({
     setPage(Math.floor(position / shelf.pageSize) + 1);
     setReader(null);
     if (history.state?.kotobaReader === key) history.back();
+  }
+  function noteUpdated(note: Note) {
+    setData((previous) => ({
+      ...previous,
+      notes: previous.notes.map((item) => (item.id === note.id ? note : item)),
+    }));
+    setRefresh((previous) => previous + 1);
   }
   function openCollection(type: NoteType) {
     const historyKey = crypto.randomUUID();
@@ -545,6 +557,7 @@ export default function App({
           initialCount={data.counts[collection.category]}
           historyKey={collection.historyKey}
           close={closeCollection}
+          onUpdated={noteUpdated}
         />
       )}
       {reader && (
@@ -554,6 +567,7 @@ export default function App({
           source={reader.source}
           historyKey={reader.historyKey}
           close={closeReader}
+          onUpdated={noteUpdated}
         />
       )}
       {importOpen && (

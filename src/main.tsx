@@ -4,6 +4,7 @@ import AuthGate from './AuthGate';
 import './styles.css';
 import './mobile.css';
 import './collection.css';
+import './editor.css';
 import './auth.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

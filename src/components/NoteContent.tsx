@@ -1,6 +1,15 @@
 import type { Note } from '../../shared/notes';
+import SpeechButton from './SpeechButton';
 
-export default function NoteContent({ note, full = false }: { note: Note; full?: boolean }) {
+export default function NoteContent({
+  note,
+  full = false,
+  playable = false,
+}: {
+  note: Note;
+  full?: boolean;
+  playable?: boolean;
+}) {
   const isWord = note.type === 'word';
   const hasAccent = typeof note.accent === 'number' && note.accent >= 0;
   const term = (
@@ -40,7 +49,12 @@ export default function NoteContent({ note, full = false }: { note: Note; full?:
       {(note.example || (full && note.exampleTranslation)) && (
         <div className="note-example">
           <span className="example-label">{note.example ? '例句' : '例句译文'}</span>
-          {note.example && <p lang="ja">{note.example}</p>}
+          {note.example && (
+            <p lang="ja">
+              {note.example}
+              {playable && <SpeechButton key={`${note.id}-${note.revision}`} note={note} />}
+            </p>
+          )}
           {full && note.exampleTranslation && (
             <p className="example-translation">{note.exampleTranslation}</p>
           )}

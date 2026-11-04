@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, ChevronRight, LoaderCircle } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronRight, LoaderCircle, Minus, Plus, Type } from 'lucide-react';
 import { categories, type Note, type NoteType, type NotesResponse } from '../../shared/notes';
 import { responseBody } from '../api';
+import { usePreference } from '../preferences';
 import Modal from './Modal';
 import Reader from './Reader';
 
@@ -13,14 +14,19 @@ export default function CollectionList({
   sort,
   initialCount,
   historyKey,
+  onUpdated,
   close,
 }: {
   category: NoteType;
   sort: string;
   initialCount: number;
   historyKey: string;
+  onUpdated?: (note: Note) => void;
   close: () => void;
 }) {
+  const [savedSize, setSavedSize] = usePreference('kotoba-list-size', '1');
+  const listSize = Math.max(0, Math.min(3, Number(savedSize) || 0));
+  const [sizeOpen, setSizeOpen] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [total, setTotal] = useState(initialCount);
   const [page, setPage] = useState(1);
@@ -31,6 +37,8 @@ export default function CollectionList({
   const scroll = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLDivElement>(null);
   const fetching = useRef(true);
+  const dirty = useRef(false);
+  const refreshAll = useRef(false);
   const closeRef = useRef(close);
   closeRef.current = close;
   const label = categories[category].label;
@@ -49,27 +57,43 @@ export default function CollectionList({
     fetching.current = true;
     setLoading(true);
     setError('');
-    const params = new URLSearchParams({
-      category,
-      sort,
-      page: String(page),
-      pageSize: String(pageSize),
+    const replacing = refreshAll.current;
+    refreshAll.current = false;
+    const oldScroll = scroll.current?.scrollTop ?? 0;
+    async function read() {
+      const results: NotesResponse[] = [];
+      const pages = replacing ? Array.from({ length: page }, (_, i) => i + 1) : [page];
+      for (const current of pages) {
+        const params = new URLSearchParams({
+          category,
+          sort,
+          page: String(current),
+          pageSize: String(pageSize),
+        });
+        results.push(
+          await fetch(`/api/notes?${params}`, { signal: controller.signal }).then(
+            responseBody<NotesResponse>,
+          ),
+        );
+      }
+      if (controller.signal.aborted) return;
+      const incoming = results.flatMap((result) => result.notes);
+      setNotes((previous) => (replacing || page === 1 ? incoming : [...previous, ...incoming]));
+      setTotal(results[0].total);
+      if (replacing)
+        requestAnimationFrame(() =>
+          scroll.current?.scrollTo({ top: oldScroll, behavior: 'instant' }),
+        );
+      fetching.current = false;
+      setLoading(false);
+    }
+    void read().catch((cause: Error) => {
+      if (controller.signal.aborted) return;
+      if (replacing) refreshAll.current = true;
+      fetching.current = false;
+      setLoading(false);
+      setError(cause.message);
     });
-    fetch(`/api/notes?${params}`, { signal: controller.signal })
-      .then(responseBody<NotesResponse>)
-      .then((result) => {
-        if (controller.signal.aborted) return;
-        setNotes((previous) => (page === 1 ? result.notes : [...previous, ...result.notes]));
-        setTotal(result.total);
-        fetching.current = false;
-        setLoading(false);
-      })
-      .catch((cause: Error) => {
-        if (controller.signal.aborted) return;
-        fetching.current = false;
-        setLoading(false);
-        setError(cause.message);
-      });
     return () => controller.abort();
   }, [category, sort, page, reload]);
 
@@ -97,18 +121,59 @@ export default function CollectionList({
   function closeReader() {
     const key = reader?.historyKey;
     setReader(null);
+    if (dirty.current) {
+      dirty.current = false;
+      refreshAll.current = true;
+      setReload((previous) => previous + 1);
+    }
     if (key && history.state?.kotobaReader === key) history.back();
   }
 
   return (
     <>
-      <Modal title={`${label}预览列表`} close={close} className="collection-list">
+      <Modal
+        title={`${label}预览列表`}
+        close={close}
+        className={`collection-list list-size-${listSize}`}
+      >
         <header className="collection-list-header">
           <button className="text-button" onClick={close}>
             <ArrowLeft size={18} /> 返回书库
           </button>
-          <span className={`type-badge ${category}`}>{categories[category].english}</span>
+          <div className="collection-list-actions">
+            <span className={`type-badge ${category}`}>{categories[category].english}</span>
+            <button
+              className="icon-button"
+              aria-label="调整列表字号"
+              aria-expanded={sizeOpen}
+              onClick={() => setSizeOpen(!sizeOpen)}
+            >
+              <Type size={21} />
+            </button>
+          </div>
         </header>
+        {sizeOpen && (
+          <div className="list-size-controls" aria-label="列表字号设置">
+            <span>列表字号</span>
+            <button
+              className="icon-button"
+              aria-label="缩小列表字号"
+              disabled={listSize === 0}
+              onClick={() => setSavedSize(String(listSize - 1))}
+            >
+              <Minus size={18} />
+            </button>
+            <span aria-live="polite">{['小', '标准', '大', '特大'][listSize]}</span>
+            <button
+              className="icon-button"
+              aria-label="放大列表字号"
+              disabled={listSize === 3}
+              onClick={() => setSavedSize(String(listSize + 1))}
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+        )}
         <div className="collection-list-title">
           <h1 tabIndex={-1} data-dialog-focus>
             {label}
@@ -197,6 +262,11 @@ export default function CollectionList({
           historyKey={reader.historyKey}
           returnLabel="返回预览列表"
           close={closeReader}
+          onUpdated={(note) => {
+            dirty.current = true;
+            setNotes((previous) => previous.map((item) => (item.id === note.id ? note : item)));
+            onUpdated?.(note);
+          }}
         />
       )}
     </>

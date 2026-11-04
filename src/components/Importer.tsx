@@ -185,7 +185,10 @@ export default function Importer({
           <div className="import-note-preview">
             {current && (
               <article key={preview} className={`preview-note ${current.type}`}>
-                <NoteContent note={{ ...current, id: 'preview', createdAt: '' }} full />
+                <NoteContent
+                  note={{ ...current, id: 'preview', createdAt: '', revision: 0 }}
+                  full
+                />
               </article>
             )}
           </div>

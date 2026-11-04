@@ -11,7 +11,9 @@ export type NoteInput = {
   example?: string;
   exampleTranslation?: string;
 };
-export type Note = NoteInput & { id: string; createdAt: string };
+export type Note = NoteInput & { id: string; createdAt: string; revision: number };
+export type NoteContext = { index: number | null; total: number };
+export type NoteUpdateResponse = { note: Note; context: NoteContext };
 export type Counts = Record<Category, number>;
 export type NotesResponse = {
   notes: Note[];
