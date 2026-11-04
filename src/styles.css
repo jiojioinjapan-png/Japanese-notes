@@ -9,7 +9,6 @@
   --bg: #faf9f6;
   --sidebar: #f1f0eb;
   --surface: #fffefa;
-  --paper: #fff8df;
   --text: #34332d;
   --muted: #85837b;
   --border: #e6e4dd;
@@ -28,7 +27,6 @@
   --bg: #242522;
   --sidebar: #1e201d;
   --surface: #2b2d28;
-  --paper: #343226;
   --text: #edece4;
   --muted: #aeafa2;
   --border: #41433a;
@@ -715,9 +713,6 @@ input[type='search']::-webkit-search-cancel-button {
   border-color: #b9ad97;
   box-shadow: var(--shadow);
 }
-.note-card.word {
-  background: var(--paper);
-}
 .note-card-top {
   display: flex;
   align-items: center;
@@ -766,7 +761,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 .word-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   min-width: 0;
@@ -780,55 +775,38 @@ input[type='search']::-webkit-search-cancel-button {
   letter-spacing: 0.5px;
 }
 .word-term {
-  font-size: clamp(54px, 30cqh, 90px);
-  font-weight: 700;
-  line-height: 1.22;
-  letter-spacing: 1px;
   white-space: nowrap;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.word-term.long-term {
-  font-size: clamp(34px, 17cqh, 65px);
 }
 .accent {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 3px;
-  border: 1.4px solid currentColor;
-  border-radius: 50%;
-  width: 1.28em;
-  height: 1.28em;
-  font-family: var(--serif);
-  font-size: clamp(21px, 8cqh, 32px);
-  font-weight: 500;
-  line-height: 1;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 4px;
+  border: 1px solid #b0a99b;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 19px;
+  font-variant-numeric: tabular-nums;
 }
 .pronunciation {
-  font-family: var(--serif);
-  font-size: clamp(22px, 9cqh, 32px);
-  letter-spacing: 2px;
-  line-height: 1.7;
-  margin-top: 16px;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-top: 5px;
   overflow-wrap: anywhere;
 }
 .part-of-speech {
-  font-family: var(--serif);
-  font-size: clamp(20px, 8cqh, 27px);
+  font-size: 12px;
+  color: var(--muted);
   line-height: 1.6;
-  margin-top: 18px;
-}
-.part-of-speech > span {
-  display: inline;
-  position: relative;
-  isolation: isolate;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-  background: linear-gradient(transparent 78%, #6edeee 78%, #6edeee 96%, transparent 96%);
-  padding: 0 2px 3px;
+  margin-top: 8px;
 }
 .note-meaning {
   font-size: 16px;
@@ -867,7 +845,7 @@ input[type='search']::-webkit-search-cancel-button {
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
-.note-card .note-term:not(.word-term) {
+.note-card .note-term {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -936,19 +914,19 @@ input[type='search']::-webkit-search-cancel-button {
   grid-row: 1/3;
 }
 .list-view .word-term {
-  font-size: 40px;
+  font-size: 27px;
 }
 .list-view .accent {
-  font-size: 22px;
+  font-size: 12px;
 }
 .list-view .pronunciation {
   grid-column: 2;
-  font-size: 19px;
+  font-size: 14px;
   margin: 0;
 }
 .list-view .part-of-speech {
   grid-column: 2;
-  font-size: 18px;
+  font-size: 12px;
   margin: 0;
 }
 .list-view .word-entry > .note-meaning {
@@ -1034,9 +1012,6 @@ input[type='search']::-webkit-search-cancel-button {
   max-height: none;
   background: var(--surface);
 }
-.reader.word {
-  background: var(--paper);
-}
 .reader-toolbar {
   display: flex;
   align-items: center;
@@ -1078,10 +1053,6 @@ input[type='search']::-webkit-search-cancel-button {
   backface-visibility: hidden;
   transform-origin: left center;
 }
-.reader-page.word,
-.reader-turn-preview.word {
-  background: var(--paper);
-}
 .reader-page {
   overflow-y: auto;
   overflow-x: hidden;
@@ -1094,38 +1065,29 @@ input[type='search']::-webkit-search-cancel-button {
 .reader-turn-preview .type-badge {
   margin-bottom: 30px;
 }
-.reader-page.word .type-badge,
-.reader-turn-preview.word .type-badge {
-  display: none;
-}
 .reader-page .word-term,
 .reader-turn-preview .word-term {
-  font-size: clamp(60px, 13vw, 100px);
-  line-height: 1.35;
   overflow: visible;
   white-space: normal;
   text-overflow: clip;
-  font-weight: 700;
-}
-.reader-page .word-term.long-term,
-.reader-turn-preview .word-term.long-term {
-  font-size: clamp(40px, 9vw, 74px);
 }
 .reader-page .accent,
 .reader-turn-preview .accent {
-  font-size: 34px;
-  margin-top: 12px;
+  font-size: 14px;
+  min-width: 24px;
+  height: 24px;
+  line-height: 22px;
 }
 .reader-page .pronunciation,
 .reader-turn-preview .pronunciation {
-  font-size: 34px;
+  font-size: 20px;
   line-height: 1.8;
-  margin-top: 24px;
+  margin-top: 5px;
 }
 .reader-page .part-of-speech,
 .reader-turn-preview .part-of-speech {
-  font-size: 29px;
-  margin-top: 28px;
+  font-size: 15px;
+  margin-top: 10px;
 }
 .reader-page .note-meaning,
 .reader-turn-preview .note-meaning {
@@ -1134,8 +1096,8 @@ input[type='search']::-webkit-search-cancel-button {
   line-height: 1.9;
   margin-top: 32px;
 }
-.reader-page .note-term:not(.word-term),
-.reader-turn-preview .note-term:not(.word-term) {
+.reader-page .note-term,
+.reader-turn-preview .note-term {
   font-size: 48px;
   line-height: 1.6;
 }
@@ -1233,17 +1195,14 @@ input[type='search']::-webkit-search-cancel-button {
   font-size: 10px;
   color: var(--muted);
 }
-.large-text .reader-page .note-term:not(.word-term) {
+.large-text .reader-page .note-term {
   font-size: 56px;
 }
-.large-text .reader-page .word-term {
-  font-size: clamp(68px, 16vw, 116px);
-}
 .large-text .reader-page .pronunciation {
-  font-size: 39px;
+  font-size: 24px;
 }
 .large-text .reader-page .part-of-speech {
-  font-size: 34px;
+  font-size: 18px;
 }
 .large-text .reader-page .note-meaning {
   font-size: 29px;
@@ -1387,21 +1346,6 @@ input[type='search']::-webkit-search-cancel-button {
   background: var(--surface);
   container-type: inline-size;
 }
-.preview-note.word {
-  background: var(--paper);
-}
-.preview-note .word-term {
-  font-size: 65px;
-}
-.preview-note .accent {
-  font-size: 27px;
-}
-.preview-note .pronunciation {
-  font-size: 27px;
-}
-.preview-note .part-of-speech {
-  font-size: 24px;
-}
 .preview-note .note-meaning {
   font-size: 18px;
 }
@@ -1519,17 +1463,6 @@ input[type='search']::-webkit-search-cancel-button {
   color: #afc393;
 }
 @container note-card (height < 300px) {
-  .note-card .word-term {
-    font-size: clamp(56px, 30cqh, 78px);
-  }
-  .note-card .pronunciation {
-    font-size: clamp(25px, 12cqh, 32px);
-    margin-top: 10px;
-  }
-  .note-card .part-of-speech {
-    font-size: clamp(22px, 10cqh, 28px);
-    margin-top: 10px;
-  }
   .note-card .note-meaning {
     margin-top: 13px;
     font-size: 15px;
@@ -1543,24 +1476,22 @@ input[type='search']::-webkit-search-cancel-button {
 }
 @container note-card (height < 230px) {
   .note-card .note-card-footer,
-  .note-card .word-entry > .note-meaning,
   .note-card .note-example {
     display: none;
   }
-  .note-card .word-term {
-    font-size: clamp(42px, 30cqh, 66px);
-  }
   .note-card .pronunciation {
-    font-size: 25px;
-    margin-top: 8px;
+    margin-top: 2px;
   }
   .note-card .part-of-speech {
-    font-size: 23px;
-    margin-top: 9px;
+    margin-top: 2px;
   }
-  .note-card .expression-entry > .note-term {
+  .note-card .note-term {
     font-size: 28px;
     line-height: 1.5;
+  }
+  .note-card .note-meaning {
+    margin-top: 8px;
+    font-size: 14px;
   }
   .note-card .note-card-top {
     margin-bottom: 9px;
@@ -1578,17 +1509,17 @@ input[type='search']::-webkit-search-cancel-button {
     grid-row: 1/3;
   }
   .note-card .word-term {
-    font-size: 35px;
+    font-size: 24px;
   }
   .note-card .accent {
-    font-size: 20px;
+    font-size: 12px;
   }
   .note-card .pronunciation {
-    font-size: 18px;
+    font-size: 14px;
     margin: 0;
   }
   .note-card .part-of-speech {
-    font-size: 16px;
+    font-size: 12px;
     margin: 0;
   }
   .note-card .expression-entry {
@@ -1683,9 +1614,6 @@ input[type='search']::-webkit-search-cancel-button {
   }
 }
 
-.note-card.word .note-card-footer {
-  display: none;
-}
 @media (max-height: 700px) and (min-width: 761px) {
   .intro,
   .collection-section {

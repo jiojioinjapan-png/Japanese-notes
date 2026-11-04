@@ -428,14 +428,12 @@ export default function App({
                       onClick={() => openReader(note, index)}
                       aria-label={`阅读：${note.term}`}
                     >
-                      {note.type !== 'word' && (
-                        <div className="note-card-top">
-                          <span className={`type-badge ${note.type}`}>
-                            {categories[note.type].label}
-                          </span>
-                          <ArrowRight size={16} />
-                        </div>
-                      )}
+                      <div className="note-card-top">
+                        <span className={`type-badge ${note.type}`}>
+                          {categories[note.type].label}
+                        </span>
+                        <ArrowRight size={16} />
+                      </div>
                       <div className="note-card-content">
                         <NoteContent note={note} />
                       </div>

@@ -245,7 +245,7 @@
     padding: 21px;
     border-radius: 13px;
   }
-  .note-term:not(.word-term) {
+  .note-term {
     font-size: 32px;
   }
   .note-meaning {
@@ -273,16 +273,16 @@
     --card-min-height: 145;
   }
   .list-view .word-term {
-    font-size: 36px;
+    font-size: 24px;
   }
   .list-view .accent {
-    font-size: 21px;
+    font-size: 12px;
   }
   .list-view .pronunciation {
-    font-size: 17px;
+    font-size: 14px;
   }
   .list-view .part-of-speech {
-    font-size: 16px;
+    font-size: 12px;
   }
   .list-view .expression-entry > .note-term {
     font-size: 24px;
@@ -320,28 +320,17 @@
   .reader-turn-preview {
     padding: 26px max(27px, var(--safe-right)) 35px max(27px, var(--safe-left));
   }
-  .reader-page .word-term,
-  .reader-turn-preview .word-term {
-    font-size: clamp(62px, 20vw, 86px);
-  }
-  .reader-page .word-term.long-term,
-  .reader-turn-preview .word-term.long-term {
-    font-size: clamp(39px, 12vw, 61px);
-  }
   .reader-page .accent,
   .reader-turn-preview .accent {
-    font-size: 29px;
-    margin-top: 6px;
+    font-size: 12px;
   }
   .reader-page .pronunciation,
   .reader-turn-preview .pronunciation {
-    font-size: 30px;
-    margin-top: 24px;
+    font-size: 17px;
   }
   .reader-page .part-of-speech,
   .reader-turn-preview .part-of-speech {
-    font-size: 27px;
-    margin-top: 28px;
+    font-size: 14px;
   }
   .reader-page .note-meaning,
   .reader-turn-preview .note-meaning {
@@ -349,8 +338,8 @@
     line-height: 1.95;
     margin-top: 30px;
   }
-  .reader-page .note-term:not(.word-term),
-  .reader-turn-preview .note-term:not(.word-term) {
+  .reader-page .note-term,
+  .reader-turn-preview .note-term {
     font-size: 37px;
     line-height: 1.7;
   }
@@ -376,20 +365,14 @@
       max(20px, var(--safe-left));
     gap: 32px;
   }
-  .large-text .reader-page .word-term {
-    font-size: clamp(72px, 24vw, 104px);
-  }
-  .large-text .reader-page .word-term.long-term {
-    font-size: clamp(45px, 15vw, 72px);
-  }
-  .large-text .reader-page .note-term:not(.word-term) {
+  .large-text .reader-page .note-term {
     font-size: 44px;
   }
   .large-text .reader-page .pronunciation {
-    font-size: 35px;
+    font-size: 21px;
   }
   .large-text .reader-page .part-of-speech {
-    font-size: 31px;
+    font-size: 17px;
   }
   .large-text .reader-page .note-meaning {
     font-size: 25px;
@@ -451,15 +434,6 @@
   }
   .preview-note {
     padding: 21px;
-  }
-  .preview-note .word-term {
-    font-size: 59px;
-  }
-  .preview-note .pronunciation {
-    font-size: 26px;
-  }
-  .preview-note .part-of-speech {
-    font-size: 23px;
   }
   .preview-pagination {
     gap: 23px;
@@ -606,9 +580,6 @@
     padding-left: max(22px, var(--safe-left));
     padding-right: max(22px, var(--safe-right));
   }
-  .reader-page .word-term {
-    font-size: 65px;
-  }
   .import-header h2 {
     font-size: 20px;
   }
@@ -729,17 +700,6 @@
   .reader-turn-preview {
     padding-top: 20px;
     padding-bottom: 25px;
-  }
-  .reader-page .word-term {
-    font-size: 65px;
-  }
-  .reader-page .pronunciation {
-    font-size: 28px;
-    margin-top: 15px;
-  }
-  .reader-page .part-of-speech {
-    font-size: 25px;
-    margin-top: 18px;
   }
 }
 html[data-keyboard='true'] .mobile-tabbar {

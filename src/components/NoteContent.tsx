@@ -14,10 +14,7 @@ export default function NoteContent({ note, full = false }: { note: Note; full?:
     return (
       <div className="word-entry">
         <div className="word-heading">
-          <h3
-            className={`note-term word-term ${[...note.term].length > 4 ? 'long-term' : ''}`}
-            lang="ja"
-          >
+          <h3 className="note-term word-term" lang="ja">
             {note.term}
           </h3>
           <span

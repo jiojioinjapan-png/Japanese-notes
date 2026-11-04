@@ -1,9 +1,7 @@
 import { expect, test } from './fixtures';
 import { expectFixedViewport, returnHome, searchNotes } from './helpers';
 
-test('word card follows the reference hierarchy and opens a complete reading page', async ({
-  page,
-}) => {
+test('word card retains its reading order and opens a complete reading page', async ({ page }) => {
   await page.goto('/');
   await searchNotes(page, '多彩');
   const card = page.getByRole('button', { name: '阅读：多彩', exact: true });
@@ -15,14 +13,6 @@ test('word card follows the reference hierarchy and opens a complete reading pag
   expect(accent.x).toBeGreaterThan(kanji.x);
   expect(reading.y).toBeGreaterThan(kanji.y);
   expect(part.y).toBeGreaterThan(reading.y);
-  expect(
-    await card.locator('.accent').evaluate((element) => getComputedStyle(element).borderRadius),
-  ).toBe('50%');
-  expect(
-    await card
-      .locator('.part-of-speech > span')
-      .evaluate((element) => getComputedStyle(element).backgroundImage),
-  ).toContain('110, 222, 238');
   await card.click();
   const reader = page.getByRole('dialog', { name: '笔记阅读' });
   await expect(reader.locator('.reader-page').getByText('たさい', { exact: true })).toBeVisible();
