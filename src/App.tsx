@@ -16,6 +16,7 @@ import {
   Library,
   List,
   LoaderCircle,
+  LogOut,
   Moon,
   Plus,
   Search,
@@ -39,36 +40,11 @@ import {
   type NoteType,
 } from '../shared/notes';
 
+import { responseBody } from './api';
+import { usePreference, useTheme } from './preferences';
+
 const emptyCounts: Counts = { all: 0, word: 0, onomatopoeia: 0, grammar: 0 };
 const icons = { word: Type, onomatopoeia: Headphones, grammar: BookOpen };
-function savedPreference(key: string, fallback: string) {
-  try {
-    return localStorage.getItem(key) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-function usePreference(key: string, fallback: string) {
-  const [value, setValue] = useState(() => savedPreference(key, fallback));
-  const update = (next: string) => {
-    setValue(next);
-    try {
-      localStorage.setItem(key, next);
-    } catch {
-      /* Storage can be disabled. */
-    }
-  };
-  return [value, update] as const;
-}
-async function responseBody<T>(response: Response): Promise<T> {
-  if (!response.headers.get('content-type')?.includes('application/json'))
-    throw new Error('服务暂时不可用，请稍后重试。');
-  const body = (await response.json()) as { error?: string; issues?: string[] };
-  if (!response.ok)
-    throw new Error([body.error, ...(body.issues ?? [])].filter(Boolean).join('\n'));
-  return body as T;
-}
-
 function Modal({
   title,
   children,
@@ -293,7 +269,6 @@ function Importer({
   onImported: (message: string) => void;
 }) {
   const [code, setCode] = useState('');
-  const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
@@ -335,7 +310,7 @@ function Importer({
     try {
       const response = await fetch('/api/notes/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: validation.notes }),
       });
       const body = await responseBody<{ inserted: number; skipped: number }>(response);
@@ -442,18 +417,6 @@ function Importer({
           </div>
         </div>
       )}
-      <label className="token-label" htmlFor="import-token">
-        导入密钥
-      </label>
-      <input
-        id="import-token"
-        type="password"
-        value={token}
-        disabled={busy}
-        autoComplete="off"
-        placeholder="输入你在 Cloudflare 设置的密钥"
-        onChange={(event) => setToken(event.target.value)}
-      />
       <p className="import-hint">
         <CircleHelp size={14} /> 每批最多 500 条、1 MiB；完全相同的笔记会自动跳过。
       </p>
@@ -481,7 +444,7 @@ function Importer({
         </a>
         <button
           className="primary-button"
-          disabled={busy || !validation.notes.length || !token.trim() || !!result}
+          disabled={busy || !validation.notes.length || !!result}
           onClick={() => void upload()}
         >
           {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
@@ -492,17 +455,22 @@ function Importer({
   );
 }
 
-export default function App() {
+export default function App({
+  username,
+  onLogout,
+  logoutBusy,
+}: {
+  username: string;
+  onLogout: () => Promise<void>;
+  logoutBusy: boolean;
+}) {
   const [category, setCategory] = useState<Category>('all');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('recent');
   const [page, setPage] = useState(1);
   const [view, setView] = usePreference('kotoba-view', 'grid');
-  const [theme, setTheme] = usePreference(
-    'kotoba-theme',
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
-  );
+  const [theme, setTheme] = useTheme();
   const [mobileTab, setMobileTab] = useState<'library' | 'search'>('library');
   const searchRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<NotesResponse>({
@@ -519,12 +487,6 @@ export default function App() {
   const [reader, setReader] = useState<{ notes: Note[]; index: number } | null>(null);
   const [toast, setToast] = useState('');
   const notesRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#242522' : '#faf9f6');
-  }, [theme]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setQuery(search.trim());
@@ -561,6 +523,13 @@ export default function App() {
     setPage(1);
     if (scroll) notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
+  async function handleLogout() {
+    try {
+      await onLogout();
+    } catch {
+      setToast('退出失败，请检查网络后重试。');
+    }
+  }
   function showLibrary() {
     setMobileTab('library');
     setCategory('all');
@@ -596,13 +565,23 @@ export default function App() {
             ことば<span>日语笔记</span>
           </span>
         </button>
-        <button
-          className="icon-button"
-          aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
-          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-        >
-          {theme === 'light' ? <Moon size={21} /> : <Sun size={21} />}
-        </button>
+        <div className="mobile-header-actions">
+          <button
+            className="icon-button"
+            aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          >
+            {theme === 'light' ? <Moon size={21} /> : <Sun size={21} />}
+          </button>
+          <button
+            className="icon-button"
+            aria-label="退出登录"
+            disabled={logoutBusy}
+            onClick={() => void handleLogout()}
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
       <aside className="sidebar">
         <a className="brand" href="/" aria-label="ことば日语笔记首页">
@@ -647,7 +626,9 @@ export default function App() {
           <div className="note-rule" />
         </div>
         <div className="sidebar-bottom">
-          <span>我的日语小书架</span>
+          <span className="signed-in-user" title={username}>
+            {username}
+          </span>
           <button
             className="icon-button"
             aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
@@ -667,6 +648,14 @@ export default function App() {
           </div>
           <div className="topbar-actions">
             <span className="topbar-date">{date}</span>
+            <button
+              className="icon-button"
+              aria-label="退出登录"
+              disabled={logoutBusy}
+              onClick={() => void handleLogout()}
+            >
+              <LogOut size={19} />
+            </button>
             <button className="primary-button" onClick={() => setImportOpen(true)}>
               <Plus size={17} /> 导入笔记
             </button>

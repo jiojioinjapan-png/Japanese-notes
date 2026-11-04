@@ -3,13 +3,32 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { build } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { exampleImport } from '../shared/notes';
+import worker, { type Env } from '../worker/index';
 
 let mf: Miniflare;
 let db: Awaited<ReturnType<Miniflare['getD1Database']>>;
-const key = 'test-only-import-key';
-const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` };
-async function request(path: string, init?: Parameters<Miniflare['dispatchFetch']>[1]) {
-  return mf.dispatchFetch(`http://localhost${path}`, init);
+const username = 'test-reader';
+const password = 'test-only-account-password';
+let sessionCookie = '';
+const headers = { 'Content-Type': 'application/json' };
+async function request(
+  path: string,
+  init?: Parameters<Miniflare['dispatchFetch']>[1],
+  authenticated = true,
+) {
+  const requestHeaders = new Headers(init?.headers as HeadersInit);
+  if (authenticated && !requestHeaders.has('Cookie')) requestHeaders.set('Cookie', sessionCookie);
+  return mf.dispatchFetch(`http://localhost${path}`, {
+    ...init,
+    headers: Object.fromEntries(requestHeaders.entries()),
+  });
+}
+async function login(credentials = { username, password }, extraHeaders = {}) {
+  return request(
+    '/api/auth/login',
+    { method: 'POST', headers: { ...headers, ...extraHeaders }, body: JSON.stringify(credentials) },
+    false,
+  );
 }
 async function upload(body: unknown, extraHeaders = {}) {
   return request('/api/notes/import', {
@@ -36,21 +55,30 @@ beforeAll(async () => {
       script: built.outputFiles[0].text,
       compatibilityDate: '2025-11-01',
       d1Databases: ['DB'],
-      bindings: { ADMIN_TOKEN: key },
+      bindings: { LOGIN_USERNAME: username, LOGIN_PASSWORD: password },
     }),
   );
   db = await mf.getD1Database('DB');
-  const migration = await readFile('migrations/0001_create_notes.sql', 'utf8');
-  const statements = migration
-    .replace(/--[^\n]*/g, '')
-    .split(';')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  await db.batch(statements.map((s) => db.prepare(s)));
+  for (const file of ['0001_create_notes.sql', '0002_authentication.sql']) {
+    const migration = await readFile(`migrations/${file}`, 'utf8');
+    const statements = migration
+      .replace(/--[^\n]*/g, '')
+      .split(';')
+      .map((sql) => sql.trim())
+      .filter(Boolean);
+    await db.batch(statements.map((sql) => db.prepare(sql)));
+  }
   expect(await count()).toBe(3);
 });
 beforeEach(async () => {
-  await db.prepare('DELETE FROM notes').run();
+  await db.batch(
+    ['DELETE FROM notes', 'DELETE FROM auth_sessions', 'DELETE FROM auth_attempts'].map((sql) =>
+      db.prepare(sql),
+    ),
+  );
+  const authenticated = await login();
+  expect(authenticated.status).toBe(200);
+  sessionCookie = authenticated.headers.get('Set-Cookie')!.split(';')[0];
 });
 afterAll(async () => {
   await mf?.dispose();
@@ -148,8 +176,21 @@ describe('Worker with a real local D1 database', () => {
   ])('rejects invalid list parameters %s', async (path) => {
     expect((await request(path)).status).toBe(400);
   });
-  it('requires an import key and blocks foreign origins and wrong content types', async () => {
-    expect((await upload(exampleImport, { Authorization: 'Bearer wrong' })).status).toBe(401);
+  it('requires a session and blocks foreign origins and wrong content types', async () => {
+    expect((await request('/api/notes', undefined, false)).status).toBe(401);
+    expect(
+      (
+        await request(
+          '/api/notes/import',
+          {
+            method: 'POST',
+            headers: { ...headers, Authorization: 'Bearer legacy-import-key' },
+            body: JSON.stringify(exampleImport),
+          },
+          false,
+        )
+      ).status,
+    ).toBe(401);
     expect((await upload(exampleImport, { Origin: 'https://other.example' })).status).toBe(403);
     expect((await upload(exampleImport, { 'Content-Type': 'text/plain' })).status).toBe(415);
     expect(await count()).toBe(0);
@@ -171,5 +212,156 @@ describe('Worker with a real local D1 database', () => {
     expect(missing.status).toBe(404);
     expect(missing.headers.get('content-type')).toContain('application/json');
     expect((await request('/api/notes', { method: 'DELETE' })).status).toBe(405);
+  });
+});
+
+describe('account authentication and server-side sessions', () => {
+  it('does not reveal the configured username until login and keeps passwords out of responses', async () => {
+    const anonymous = await request('/api/auth/session', undefined, false);
+    expect(await anonymous.json()).toEqual({ authenticated: false });
+    expect(await (await request('/api/auth/session')).json()).toEqual({
+      authenticated: true,
+      username,
+    });
+    const rejected = await login({ username, password: 'wrong-password' });
+    expect(rejected.status).toBe(401);
+    expect(await rejected.json()).toEqual({ error: '账号或密码不正确。' });
+    const unknown = await login({ username: 'unknown-reader', password });
+    expect(await unknown.json()).toEqual({ error: '账号或密码不正确。' });
+  });
+  it("anonymous status and failed reads cannot overwrite another request's fresh login cookie", async () => {
+    const response = await login();
+    expect(response.headers.get('Set-Cookie')).toBeTruthy();
+    const status = await request('/api/auth/session', undefined, false);
+    const denied = await request('/api/notes', undefined, false);
+    expect(status.headers.get('Set-Cookie')).toBeNull();
+    expect(denied.headers.get('Set-Cookie')).toBeNull();
+  });
+  it('uses Secure host-only HttpOnly cookies over HTTPS and stores only a token hash in D1', async () => {
+    const response = await mf.dispatchFetch('https://notes.example/api/auth/login', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ username, password }),
+    });
+    expect(response.status).toBe(200);
+    const cookie = response.headers.get('Set-Cookie')!;
+    expect(cookie).toMatch(/^__Host-kotoba_session=/);
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('SameSite=Lax');
+    expect(cookie).toContain('Max-Age=2592000');
+    expect(cookie).not.toContain('Domain=');
+    const rawToken = cookie.split(';')[0].split('=')[1];
+    const rows = await db.prepare('SELECT * FROM auth_sessions').all();
+    expect(JSON.stringify(rows.results)).not.toContain(rawToken);
+    expect(JSON.stringify(rows.results)).not.toContain(password);
+    const protectedResponse = await mf.dispatchFetch('https://notes.example/api/notes', {
+      headers: { Cookie: cookie.split(';')[0] },
+    });
+    expect(protectedResponse.status).toBe(200);
+  });
+  it('revokes sessions on logout, including replay of the original cookie', async () => {
+    expect((await request('/api/auth/logout', { method: 'POST' })).status).toBe(200);
+    expect((await request('/api/notes')).status).toBe(401);
+    expect(await (await request('/api/auth/session')).json()).toEqual({ authenticated: false });
+    expect(
+      (await db.prepare('SELECT COUNT(*) AS n FROM auth_sessions').first<{ n: number }>())!.n,
+    ).toBe(0);
+  });
+  it('rejects expired sessions and removes them from D1', async () => {
+    await db.prepare('UPDATE auth_sessions SET expires_at = 0').run();
+    const response = await request('/api/notes');
+    expect(response.status).toBe(401);
+    expect(response.headers.get('Set-Cookie')).toBeNull();
+    expect(
+      (await db.prepare('SELECT COUNT(*) AS n FROM auth_sessions').first<{ n: number }>())!.n,
+    ).toBe(0);
+  });
+  it('rejects modified tokens and modified session signatures', async () => {
+    const token = sessionCookie.slice(sessionCookie.indexOf('=') + 1);
+    const forged = token[0] === 'A' ? 'B' + token.slice(1) : 'A' + token.slice(1);
+    expect(
+      (await request('/api/notes', { headers: { Cookie: `kotoba_session_dev=${forged}` } })).status,
+    ).toBe(401);
+    await db.prepare('UPDATE auth_sessions SET signature = ?').bind('00'.repeat(32)).run();
+    expect((await request('/api/notes')).status).toBe(401);
+  });
+  it('invalidates existing sessions when either environment credential changes', async () => {
+    for (const changed of [
+      { LOGIN_USERNAME: 'new-reader', LOGIN_PASSWORD: password },
+      { LOGIN_USERNAME: username, LOGIN_PASSWORD: 'new-password' },
+    ]) {
+      const env = { DB: db, ASSETS: {}, ...changed } as unknown as Env;
+      const response = await worker.fetch(
+        new Request('http://localhost/api/notes', { headers: { Cookie: sessionCookie } }),
+        env,
+      );
+      expect(response.status).toBe(401);
+    }
+  });
+  it('fails closed when either credential is missing', async () => {
+    for (const missing of [{ LOGIN_USERNAME: username }, { LOGIN_PASSWORD: password }, {}]) {
+      const env = { DB: db, ASSETS: {}, ...missing } as unknown as Env;
+      for (const path of ['/api/auth/session', '/api/notes']) {
+        const response = await worker.fetch(new Request(`http://localhost${path}`), env);
+        expect(response.status).toBe(503);
+        expect(await response.json()).toMatchObject({ code: 'AUTH_NOT_CONFIGURED' });
+      }
+      expect(
+        (
+          await worker.fetch(
+            new Request('http://localhost/api/auth/login', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ username, password }),
+            }),
+            env,
+          )
+        ).status,
+      ).toBe(503);
+    }
+  });
+  it('limits concurrent guessing attempts per IP and recovers after the window expires', async () => {
+    const ip = { 'CF-Connecting-IP': '203.0.113.40' };
+    const attempts = await Promise.all(
+      Array.from({ length: 11 }, () => login({ username, password: 'wrong' }, ip)),
+    );
+    expect(attempts.filter((result) => result.status === 401)).toHaveLength(10);
+    expect(attempts.filter((result) => result.status === 429)).toHaveLength(1);
+    expect(
+      attempts.find((result) => result.status === 429)!.headers.get('Retry-After'),
+    ).toBeTruthy();
+    await db.prepare('UPDATE auth_attempts SET reset_at = 0').run();
+    expect((await login({ username, password }, ip)).status).toBe(200);
+  });
+  it('bounds login payloads and rejects cross-site login/logout requests', async () => {
+    expect((await login({ username, password }, { Origin: 'https://other.example' })).status).toBe(
+      403,
+    );
+    expect(
+      (
+        await request('/api/auth/logout', {
+          method: 'POST',
+          headers: { Origin: 'https://other.example' },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (await request('/api/auth/login', { method: 'POST', headers, body: '{broken' }, false))
+        .status,
+    ).toBe(400);
+    expect(
+      (await request('/api/auth/login', { method: 'POST', headers, body: 'x'.repeat(4097) }, false))
+        .status,
+    ).toBe(413);
+    expect(
+      (
+        await request(
+          '/api/auth/login',
+          { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' },
+          false,
+        )
+      ).status,
+    ).toBe(415);
   });
 });

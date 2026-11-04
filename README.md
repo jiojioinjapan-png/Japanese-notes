@@ -8,6 +8,7 @@ React + TypeScript + Vite 构建界面；Cloudflare Worker 提供 API 和静态�
 
 ## 已实现
 
+- **账号登录**：账号与密码由 Cloudflare 运行时环境变量配置，登录后阅读与导入，支持退出和会话保留。
 - **单词**：词条、平假名读音、声调数字（含 `0` 调）、词性、中文释义，可选例句。
 - **拟声拟态词**：词条、中文释义、日语例句。
 - **语法**：语法表达、中文释义、日语例句。
@@ -70,7 +71,7 @@ japanese-notes-db
 ]
 ```
 
-绑定名必须是 `DB`。数据库名称如有修改，也请同步修改配置。Database ID 是资源标识，可以提交到仓库；导入密钥请按第 3 步配置。
+绑定名必须是 `DB`。数据库名称如有修改，也请同步修改配置。Database ID 是资源标识，可以提交到仓库；登录账号与密码请按第 3 步配置。
 
 ### 2. 连接 GitHub 并部署
 
@@ -93,20 +94,32 @@ Cloudflare 会根据 `package-lock.json` 安装依赖。`npm run deploy` 会先�
 
 此配置连接生产 D1。先仅启用 `main` 的生产部署；如果要开启其他分支的预览，请为预览单独配置 Worker / D1，以免预览使用生产数据。
 
-### 3. 设置导入密钥
+### 3. 设置登录账号与密码
 
-在 Worker 的 **Settings → Variables and Secrets** 中添加运行时 **Secret**：
+在 Worker 的 **Settings → Variables and Secrets** 中添加以下两个 **运行时环境变量**：
 
-```text
-名称：ADMIN_TOKEN
-值：你自己生成的一段较长的随机字符串
-```
+| 名称             | 值                   | 建议类型       |
+| ---------------- | -------------------- | -------------- |
+| `LOGIN_USERNAME` | 你希望使用的账号     | Text 或 Secret |
+| `LOGIN_PASSWORD` | 你自己设置的较长密码 | **Secret**     |
 
-保存并应用配置（控制台提示部署时完成部署）。这是 **Worker 运行时 Secret**，不需要设置成 `VITE_*`，也不应填写在仓库文件里。
+保存并应用配置（控制台提示部署时完成部署）。项目已配置 `keep_vars: true`，后续 GitHub 自动部署会保留控制台设置的普通环境变量；Secret 也会保留。这两个值只由 Worker 服务端读取，不能设置成 `VITE_*`，也不应写进仓库。Cloudflare 的 Text / Secret 类型都可通过 `env` 读取；密码建议选择 Secret。
 
-打开部署生成的 `https://japanese-notes.<你的子域>.workers.dev`，点击「导入笔记」，输入这个密钥即可上传。不设置密钥时可以阅读，导入 API 会返回 `503`，不会接受写入。
+打开部署生成的 `https://japanese-notes.<你的子域>.workers.dev`，会先看到登录页。使用上述账号密码登录后，即可阅读和批量导入，**无需再输入导入密钥**。旧版的 `ADMIN_TOKEN` 不再使用，可以从环境变量中删除。
 
-**访问范围：阅读页面和读取 API 默认公开；密钥仅保护导入。** 如果需要私人访问，可在 Cloudflare 中为站点配置 Access。
+<img src="docs/iphone-login.png" width="300" alt="iPhone 账号密码登录页" />
+
+登录行为：
+
+- 这是由一组环境变量配置的单账号书库。账号与密码区分大小写，密码首尾空格也参与校验。
+- 登录会话保留 **30 天**，适合从 iPhone 主屏幕再次打开；会话过期后需要重新登录。
+- 右上角可「退出登录」，服务端会立即撤销该会话。刷新页面或再次打开应用会检查会话状态。
+- 修改任意一个登录环境变量并应用后，已有会话会失效，需要用新账号密码登录。
+- 未登录时，所有笔记读取与导入 API 都返回 `401`；缺少任意一个配置时返回 `503`，不会开放笔记。
+- 生产会话使用 `Secure`、`HttpOnly`、`SameSite=Lax` Cookie，D1 仅保存随机会话令牌的哈希与验证信息；账号密码不会发送进前端配置，也不会写入浏览器本地存储。
+- 同一 IP 在 15 分钟内连续尝试错误账号密码超过 10 次，会暂时限制登录，并返回 `429`。
+
+本次新增 [0002_authentication.sql](./migrations/0002_authentication.sql) 迁移。保持部署命令为 `npm run deploy`，会自动创建会话与登录次数记录表，已有笔记会保留。
 
 ## JSON 导入格式
 
@@ -164,7 +177,7 @@ Cloudflare 会根据 `package-lock.json` 安装依赖。`npm run deploy` 会先�
 - 所有内容字段完全相同时才视为重复。同词条的不同释义、声调、词性、例句或例句翻译会新增一条，不会覆盖旧笔记。并发上传也由数据库唯一索引保证去重。
 - 上传成功后，书库和分类计数会自动刷新。笔记保存在 D1，可跨浏览器、跨设备访问。
 
-使用方法：点击「导入笔记」→ 粘贴 JSON 或选择文件 → 查看格式检查与内容预览 → 输入导入密钥 → 点击「上传笔记」。
+使用方法：点击「导入笔记」→ 粘贴 JSON 或选择文件 → 查看格式检查与内容预览 → 点击「上传笔记」。请先登录书库。
 
 ## 本地开发
 
@@ -175,7 +188,7 @@ npm ci
 cp .dev.vars.example .dev.vars
 ```
 
-修改 `.dev.vars` 中的 `ADMIN_TOKEN`，然后初始化本地 D1：
+修改 `.dev.vars` 中的 `LOGIN_USERNAME` 与 `LOGIN_PASSWORD`，然后初始化本地 D1：
 
 ```bash
 npm run db:migrate
@@ -202,14 +215,19 @@ npx playwright install --with-deps chromium webkit
 npm run test:e2e
 ```
 
-集成测试在独立的 Miniflare D1 中验证实际 SQL、500 条导入、去重和事务回滚。浏览器测试会自动构建并启动本地 Worker，每次重建 `.wrangler/e2e` 的独立测试数据库，使用公开的测试专用密钥，不影响开发 / 生产数据库。GitHub Actions 会自动运行测试与构建。
+集成测试在独立的 Miniflare D1 中验证实际 SQL、500 条导入、去重和事务回滚。浏览器测试会自动构建并启动本地 Worker，每次重建 `.wrangler/e2e` 的独立测试数据库，使用公开的测试专用账号密码，不影响开发 / 生产数据库。GitHub Actions 会自动运行测试与构建。
 
 ## API
 
-| 请求                     | 用途                                                                                     |
-| ------------------------ | ---------------------------------------------------------------------------------------- |
-| `GET /api/notes`         | 分页读取笔记，并返回各分类总数                                                           |
-| `POST /api/notes/import` | 批量导入，要求 `Authorization: Bearer <ADMIN_TOKEN>` 和 `Content-Type: application/json` |
+| 请求                     | 用途                                                                     |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `POST /api/auth/login`   | JSON `{ "username": "账号", "password": "密码" }`；成功后设置会话 Cookie |
+| `GET /api/auth/session`  | 检查会话；已登录时返回账号名，未登录时不泄露配置的账号                   |
+| `POST /api/auth/logout`  | 撤销当前会话并清除 Cookie                                                |
+| `GET /api/notes`         | **需登录**；分页读取笔记，并返回各分类总数                               |
+| `POST /api/notes/import` | **需登录**；批量导入，要求 `Content-Type: application/json`              |
+
+浏览器通过同源 HttpOnly Cookie 自动保持认证。脚本调用时，请先请求登录接口并保留返回的 Cookie，再请求笔记 API；旧的 Bearer 导入密钥不能代替登录。所有动态 API 响应均不缓存。
 
 读取接口的可选参数：`category=all\|word\|onomatopoeia\|grammar`、`q=关键词`（最多 200 字符）、`sort=recent\|oldest\|term`、`page=1`、`pageSize=24`（范围 1～100）。关键词匹配词条、读音、词性、中文释义、例句与翻译；`%`、`_` 等按普通文字处理。`term` 排序使用数据库字符顺序。
 
@@ -219,14 +237,16 @@ npm run test:e2e
 { "inserted": 10, "skipped": 2, "total": 12 }
 ```
 
-错误状态：`400` JSON / 字段 / 参数错误，`401` 密钥错误，`403` 跨站请求，`413` 超出大小限制，`415` 非 JSON 内容类型，`503` 尚未设置导入密钥。服务端也会重复验证输入，不能通过绕过浏览器检查写入非法笔记。
+错误状态：`400` JSON / 字段 / 参数错误，`401` 账号密码错误或会话无效，`403` 跨站请求，`413` 超出大小限制，`415` 非 JSON 内容类型，`429` 登录尝试过多，`503` 尚未设置登录账号密码。服务端也会重复验证输入，不能通过绕过浏览器检查写入非法笔记。
 
 ## 项目结构
 
 ```text
 src/                     React 界面、iPhone 布局、阅读与导入交互
 shared/notes.ts          三类笔记的数据类型和前后端共享校验
-worker/index.ts         Worker API、鉴权、D1 查询与事务导入
+worker/index.ts         笔记 API、D1 查询与事务导入
+worker/auth.ts          登录、会话撤销、环境变量校验与限流
+src/AuthGate.tsx        登录界面与会话状态管理
 migrations/             D1 数据库迁移与首次示例数据
 examples/notes.json      可上传的 JSON 示例
 public/                  主屏幕 manifest、图标及静态资源
@@ -236,4 +256,4 @@ wrangler.jsonc          Worker、静态资源与 D1 绑定配置
 .github/workflows/      GitHub 自动检查
 ```
 
-Cloudflare 参考文档：[Git 构建配置](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)、[静态资源与 SPA 路由](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/)、[D1 迁移](https://developers.cloudflare.com/d1/reference/migrations/)。
+Cloudflare 参考文档：[Git 构建配置](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)、[静态资源与 SPA 路由](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/)、[D1 迁移](https://developers.cloudflare.com/d1/reference/migrations/)、[Worker 运行时 Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)、[Wrangler 环境变量保留配置](https://developers.cloudflare.com/workers/wrangler/configuration/)。

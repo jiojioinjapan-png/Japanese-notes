@@ -36,5 +36,7 @@ await run(process.execPath, [
   '--persist-to',
   '.wrangler/e2e',
   '--var',
-  'ADMIN_TOKEN:e2e-test-import-key',
+  'LOGIN_USERNAME:e2e-reader',
+  '--var',
+  'LOGIN_PASSWORD:e2e-test-password',
 ]);

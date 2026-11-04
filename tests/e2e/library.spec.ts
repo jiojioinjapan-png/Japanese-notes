@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('browse the three collections, read a word, and search by reading', async ({ page }) => {
   await page.goto('/');
@@ -49,10 +49,6 @@ test('validate, upload, deduplicate, and persist a JSON import', async ({ page }
   });
   await input.fill(body);
   await expect(dialog.getByText('2 条笔记通过检查')).toBeVisible();
-  await dialog.getByLabel('导入密钥', { exact: true }).fill('wrong-key');
-  await dialog.getByRole('button', { name: '上传笔记' }).click();
-  await expect(dialog.getByRole('alert')).toContainText('导入密钥不正确');
-  await dialog.getByLabel('导入密钥', { exact: true }).fill('e2e-test-import-key');
   await dialog.getByRole('button', { name: '上传笔记' }).click();
   await expect(dialog.getByText('导入完成，新增 2 条，跳过 0 条重复笔记。')).toBeVisible();
   await dialog.getByRole('button', { name: '关闭导入' }).click();
@@ -60,7 +56,6 @@ test('validate, upload, deduplicate, and persist a JSON import', async ({ page }
   await expect(page.getByRole('button', { name: `阅读：${term}`, exact: true })).toBeVisible();
   await page.getByRole('button', { name: '导入笔记', exact: true }).click();
   await page.getByRole('textbox', { name: '笔记内容 JSON' }).fill(body);
-  await page.getByLabel('导入密钥', { exact: true }).fill('e2e-test-import-key');
   await page.getByRole('button', { name: '上传笔记' }).click();
   await expect(page.getByText('导入完成，新增 0 条，跳过 2 条重复笔记。')).toBeVisible();
 });

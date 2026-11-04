@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 for (const [width, height] of [
   [320, 568],
@@ -105,11 +105,9 @@ test('safe-area insets keep navigation, close and page-turn controls clear of iP
 
 test('long examples scroll inside the reader while the page-turn controls stay in place', async ({
   page,
-  request,
 }) => {
   const term = `長文テスト${Date.now()}`;
-  const imported = await request.post('/api/notes/import', {
-    headers: { Authorization: 'Bearer e2e-test-import-key' },
+  const imported = await page.request.post('/api/notes/import', {
     data: {
       notes: [
         {
@@ -193,7 +191,6 @@ test('home-screen metadata, full-size icons, and mobile import form', async ({ p
   }
   await dialog.getByRole('button', { name: '填入示例' }).tap();
   await expect(dialog.getByText('3 条笔记通过检查')).toBeVisible();
-  await dialog.getByLabel('导入密钥', { exact: true }).fill('e2e-test-import-key');
   await dialog.getByRole('button', { name: '上传笔记' }).tap();
   await expect(dialog.getByText(/导入完成，新增 0 条，跳过 3 条重复笔记。/)).toBeVisible();
   await dialog.getByRole('button', { name: '关闭导入' }).tap();

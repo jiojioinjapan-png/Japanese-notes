@@ -6,10 +6,18 @@ import {
   type NoteType,
 } from '../shared/notes';
 
-export interface Env {
-  DB: D1Database;
+import {
+  authConfigured,
+  authRoute,
+  notConfigured,
+  unauthorized,
+  validSession,
+  type AuthEnv,
+} from './auth';
+import { isJson, json, readJson, sameOrigin } from './http';
+
+export interface Env extends AuthEnv {
   ASSETS: Fetcher;
-  ADMIN_TOKEN?: string;
 }
 type Row = {
   id: string;
@@ -23,16 +31,6 @@ type Row = {
   example_translation: string;
   created_at: string;
 };
-function json(data: unknown, status = 200): Response {
-  return Response.json(data, {
-    status,
-    headers: {
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'same-origin',
-    },
-  });
-}
 function serialize(row: Row): Note {
   return {
     id: row.id,
@@ -106,58 +104,11 @@ async function listNotes(url: URL, env: Env): Promise<Response> {
     counts,
   });
 }
-/** Bound streamed bodies as well as requests declaring Content-Length. */
-async function readBody(request: Request): Promise<unknown> {
-  const limit = 1024 * 1024;
-  if (Number(request.headers.get('Content-Length')) > limit)
-    throw new RangeError('JSON 超过 1 MiB，请分批导入。');
-  if (!request.body) throw new SyntaxError();
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) {
-      await reader.cancel();
-      throw new RangeError('JSON 超过 1 MiB，请分批导入。');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return JSON.parse(new TextDecoder().decode(bytes));
-}
 async function importNotes(request: Request, env: Env): Promise<Response> {
-  if (!env.ADMIN_TOKEN?.trim())
-    return json({ error: '尚未启用导入，请先在 Cloudflare 设置 ADMIN_TOKEN。' }, 503);
-  const expected = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(`Bearer ${env.ADMIN_TOKEN}`),
-  );
-  const supplied = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(request.headers.get('Authorization') ?? ''),
-  );
-  let difference = 0;
-  const a = new Uint8Array(expected);
-  const b = new Uint8Array(supplied);
-  for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
-  if (difference) return json({ error: '导入密钥不正确，请重新输入。' }, 401);
-  const origin = request.headers.get('Origin');
-  if (origin && origin !== new URL(request.url).origin)
-    return json({ error: '不允许跨站导入。' }, 403);
-  if (
-    request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json'
-  )
-    return json({ error: '请使用 application/json。' }, 415);
+  if (!sameOrigin(request)) return json({ error: '不允许跨站导入。' }, 403);
+  if (!isJson(request)) return json({ error: '请使用 application/json。' }, 415);
   try {
-    const notes = validateImport(await readBody(request));
+    const notes = validateImport(await readJson(request));
     const statements = notes.map((note) =>
       env.DB.prepare(
         `
@@ -185,7 +136,7 @@ async function importNotes(request: Request, env: Env): Promise<Response> {
       return json({ error: '格式检查未通过，本批次未写入。', issues: error.issues }, 400);
     if (error instanceof SyntaxError)
       return json({ error: 'JSON 无法解析，请检查引号、逗号和括号。' }, 400);
-    if (error instanceof RangeError) return json({ error: error.message }, 413);
+    if (error instanceof RangeError) return json({ error: 'JSON 超过 1 MiB，请分批导入。' }, 413);
     throw error;
   }
 }
@@ -194,6 +145,9 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     try {
+      if (url.pathname.startsWith('/api/auth/')) return await authRoute(request, env);
+      if (!authConfigured(env)) return notConfigured();
+      if (!(await validSession(request, env))) return unauthorized();
       if (url.pathname === '/api/notes' && request.method === 'GET')
         return await listNotes(url, env);
       if (url.pathname === '/api/notes/import' && request.method === 'POST')

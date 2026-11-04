@@ -74,7 +74,7 @@
     min-height: 44px;
     border-radius: 50%;
   }
-  .mobile-header > .icon-button {
+  .mobile-header .icon-button {
     background: var(--input);
   }
   .mobile-tabbar {
@@ -800,4 +800,15 @@
   .collections-grid {
     max-width: 520px;
   }
+}
+
+.mobile-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.signed-in-user {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

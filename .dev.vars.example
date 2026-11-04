@@ -1,2 +1,3 @@
-# Copy to .dev.vars for local development. Never commit your real secret.
-ADMIN_TOKEN="replace-with-your-own-import-key"
+# Copy to .dev.vars for local development. Never commit real credentials.
+LOGIN_USERNAME="your-account"
+LOGIN_PASSWORD="replace-with-a-long-password"
