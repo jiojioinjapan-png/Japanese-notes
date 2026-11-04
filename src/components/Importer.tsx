@@ -171,7 +171,7 @@ export default function Importer({
               <Check size={16} /> {validation.notes.length} 条笔记通过检查
             </p>
           ) : (
-            <p className="import-hint">粘贴 JSON 或选择文件；每批最多 500 条、1 MiB。</p>
+            <p className="import-hint">仅 type 和 term 必填；每批最多 500 条、1 MiB。</p>
           )}
         </div>
       ) : (

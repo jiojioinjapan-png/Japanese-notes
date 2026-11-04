@@ -96,9 +96,74 @@ describe('Worker with a real local D1 database', () => {
     });
     expect(await count()).toBe(4);
   });
+  it('persists partial notes, preserves metadata for all types, and deduplicates all empty forms', async () => {
+    const response = await upload({
+      notes: [
+        { type: 'word', term: 'ある' },
+        { type: 'word', term: 'ある', accent: 0 },
+        {
+          type: 'onomatopoeia',
+          term: 'じっくり',
+          accent: 3,
+          partOfSpeech: '副',
+          meaning: '慢慢地',
+        },
+        { type: 'grammar', term: 'からすると', reading: null, meaning: '', example: null },
+        {
+          type: 'word',
+          term: 'みっともない',
+          accent: 5,
+          partOfSpeech: '形',
+          meaning: '不体面、丢脸',
+        },
+      ],
+    });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ inserted: 5, skipped: 0 });
+    const listing = (await (await request('/api/notes')).json()) as {
+      notes: Record<string, unknown>[];
+    };
+    const blank = listing.notes.find((note) => note.term === 'ある' && note.accent === undefined)!;
+    expect(blank).toBeDefined();
+    expect(blank).not.toHaveProperty('reading');
+    expect(blank).not.toHaveProperty('partOfSpeech');
+    expect(listing.notes.find((note) => note.term === 'ある' && note.accent === 0)).toBeDefined();
+    expect(listing.notes.find((note) => note.term === 'じっくり')).toMatchObject({
+      accent: 3,
+      partOfSpeech: '副',
+    });
+    expect(
+      await db.prepare('SELECT accent FROM notes WHERE id = ?').bind(blank.id).first(),
+    ).toEqual({ accent: -1 });
+    expect(
+      await (
+        await upload({
+          notes: [
+            {
+              type: 'word',
+              term: 'ある',
+              reading: '',
+              accent: null,
+              partOfSpeech: ' ',
+              meaning: null,
+              example: '',
+              exampleTranslation: null,
+            },
+            { type: 'grammar', term: 'からすると', accent: '', meaning: '  ', example: '' },
+          ],
+        })
+      ).json(),
+    ).toMatchObject({ inserted: 0, skipped: 2 });
+    const roundTrip = listing.notes.map(({ id: _id, createdAt: _createdAt, ...note }) => note);
+    expect(await (await upload({ notes: roundTrip })).json()).toMatchObject({
+      inserted: 0,
+      skipped: 5,
+    });
+    expect(await count()).toBe(5);
+  });
   it('rejects invalid batches without inserting the valid first row', async () => {
     const response = await upload({
-      notes: [exampleImport.notes[0], { type: 'grammar', term: 'invalid' }],
+      notes: [exampleImport.notes[0], { type: 'grammar', term: '' }],
     });
     expect(response.status).toBe(400);
     expect(await count()).toBe(0);

@@ -38,9 +38,9 @@ function serialize(row: Row): Note {
     term: row.term,
     meaning: row.meaning,
     createdAt: row.created_at,
-    ...(row.type === 'word'
-      ? { reading: row.reading, accent: row.accent, partOfSpeech: row.part_of_speech }
-      : {}),
+    ...(row.reading ? { reading: row.reading } : {}),
+    ...(row.accent >= 0 ? { accent: row.accent } : {}),
+    ...(row.part_of_speech ? { partOfSpeech: row.part_of_speech } : {}),
     ...(row.example ? { example: row.example } : {}),
     ...(row.example_translation ? { exampleTranslation: row.example_translation } : {}),
   };
@@ -122,7 +122,7 @@ async function importNotes(request: Request, env: Env): Promise<Response> {
         note.reading ?? '',
         note.accent ?? -1,
         note.partOfSpeech ?? '',
-        note.meaning,
+        note.meaning ?? '',
         note.example ?? '',
         note.exampleTranslation ?? '',
       ),

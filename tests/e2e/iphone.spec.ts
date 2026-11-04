@@ -186,3 +186,67 @@ test('home-screen metadata, icons and fixed-screen import remain functional', as
   await dialog.getByRole('button', { name: '上传笔记' }).tap();
   await expect(dialog.getByText('导入完成，新增 0 条，跳过 3 条重复笔记。')).toBeVisible();
 });
+
+test('partial notes import and render without empty labels or invented accent on iPhone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto('/');
+  await expect(page.locator('.app-shell')).toBeVisible();
+  const prefix = `未完成${Date.now()}`;
+  await page.getByRole('button', { name: '导入笔记', exact: true }).tap();
+  const importer = page.getByRole('dialog', { name: '批量导入笔记' });
+  await importer.getByRole('textbox', { name: '笔记内容 JSON' }).fill(
+    JSON.stringify({
+      notes: [
+        {
+          type: 'word',
+          term: prefix + '-word',
+          reading: '',
+          accent: null,
+          partOfSpeech: null,
+          meaning: null,
+        },
+        { type: 'onomatopoeia', term: prefix + '-sound', accent: 3, partOfSpeech: '副' },
+        { type: 'grammar', term: prefix + '-grammar', meaning: '', example: null },
+        {
+          type: 'word',
+          term: prefix + '-zero',
+          accent: 0,
+          exampleTranslation: '只有译文也会保存并显示。',
+        },
+      ],
+    }),
+  );
+  await expect(importer.getByText('4 条笔记通过检查')).toBeVisible();
+  await importer.getByRole('button', { name: '预览笔记' }).tap();
+  const preview = importer.locator('.preview-note');
+  await expect(
+    preview.locator('.accent, .pronunciation, .part-of-speech, .note-meaning, .note-example'),
+  ).toHaveCount(0);
+  await importer.getByRole('button', { name: '预览下一条' }).tap();
+  await expect(preview.locator('.accent')).toHaveText('3');
+  await expect(preview.locator('.part-of-speech')).toHaveText('副');
+  await importer.getByRole('button', { name: '预览下一条' }).tap();
+  await expect(preview.locator('.note-meaning, .note-example')).toHaveCount(0);
+  await importer.getByRole('button', { name: '预览下一条' }).tap();
+  await expect(preview.locator('.accent')).toHaveText('0');
+  await expect(preview.getByText('只有译文也会保存并显示。')).toBeVisible();
+  await importer.getByRole('button', { name: '上传笔记' }).tap();
+  await expect(importer.getByText('导入完成，新增 4 条，跳过 0 条重复笔记。')).toBeVisible();
+  await importer.getByRole('button', { name: '关闭导入' }).tap();
+  await page.reload();
+  await searchNotes(page, prefix + '-word');
+  const card = page.getByRole('button', { name: '阅读：' + prefix + '-word', exact: true });
+  await expect(card.locator('.accent, .pronunciation, .part-of-speech, .note-meaning')).toHaveCount(
+    0,
+  );
+  await card.tap();
+  await expect(page.locator('.reader-page .accent')).toHaveCount(0);
+  await page.getByRole('button', { name: '关闭阅读' }).tap();
+  await searchNotes(page, prefix + '-sound');
+  const sound = page.getByRole('button', { name: '阅读：' + prefix + '-sound', exact: true });
+  await expect(sound.locator('.accent')).toHaveText('3');
+  await expect(sound.locator('.part-of-speech')).toHaveText('副');
+  await expectFixedViewport(page);
+});

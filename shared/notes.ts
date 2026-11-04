@@ -4,7 +4,7 @@ export type Category = NoteType | 'all';
 export type NoteInput = {
   type: NoteType;
   term: string;
-  meaning: string;
+  meaning?: string;
   reading?: string;
   accent?: number;
   partOfSpeech?: string;
@@ -74,7 +74,16 @@ export class ValidationError extends Error {
     this.name = 'ValidationError';
   }
 }
-const commonFields = ['type', 'term', 'meaning', 'example', 'exampleTranslation'];
+const allowedFields = [
+  'type',
+  'term',
+  'meaning',
+  'reading',
+  'accent',
+  'partOfSpeech',
+  'example',
+  'exampleTranslation',
+];
 
 /** Shared by browser and Worker. Invalid batches never reach the database. */
 export function validateImport(input: unknown): NoteInput[] {
@@ -102,14 +111,13 @@ export function validateImport(input: unknown): NoteInput[] {
       return;
     }
     const type = row.type as NoteType;
-    const allowed =
-      type === 'word' ? [...commonFields, 'reading', 'accent', 'partOfSpeech'] : commonFields;
     for (const key of Object.keys(row)) {
-      if (!allowed.includes(key)) issues.push(`${prefix}：不支持字段 ${key}，请检查类型或拼写。`);
+      if (!allowedFields.includes(key))
+        issues.push(`${prefix}：不支持字段 ${key}，请检查类型或拼写。`);
     }
     function stringField(key: string, required: boolean, max: number): string | undefined {
       const raw = row[key];
-      if (raw === undefined && !required) return undefined;
+      if (!required && (raw == null || (typeof raw === 'string' && !raw.trim()))) return undefined;
       if (typeof raw !== 'string' || !raw.trim() || raw.trim().length > max) {
         issues.push(`${prefix}：${key} 必须是 1～${max} 字的字符串。`);
         return undefined;
@@ -117,26 +125,27 @@ export function validateImport(input: unknown): NoteInput[] {
       return raw.trim().normalize('NFC');
     }
     const term = stringField('term', true, 200);
-    const meaning = stringField('meaning', true, 2000);
-    const example = stringField('example', type !== 'word', 2000);
-    const exampleTranslation = stringField('exampleTranslation', false, 2000);
-    const note: NoteInput = { type, term: term ?? '', meaning: meaning ?? '' };
-    if (example) note.example = example;
-    if (exampleTranslation) note.exampleTranslation = exampleTranslation;
-    if (type === 'word') {
-      note.reading = stringField('reading', true, 200);
-      note.partOfSpeech = stringField('partOfSpeech', true, 100);
-      if (
-        typeof row.accent !== 'number' ||
-        !Number.isInteger(row.accent) ||
-        row.accent < 0 ||
-        row.accent > 99
-      ) {
-        issues.push(`${prefix}：accent 必须是 0～99 的整数，0 表示平板型。`);
-      } else note.accent = row.accent;
-      if (note.reading && !/^[\u3041-\u3096\u3099\u309aー・\s]+$/u.test(note.reading)) {
-        issues.push(`${prefix}：reading 请使用平假名，可包含长音符号和间隔号。`);
-      }
+    const note: NoteInput = { type, term: term ?? '' };
+    const textFields = [
+      ['meaning', 2000],
+      ['reading', 200],
+      ['partOfSpeech', 100],
+      ['example', 2000],
+      ['exampleTranslation', 2000],
+    ] as const;
+    for (const [key, max] of textFields) {
+      const value = stringField(key, false, max);
+      if (value !== undefined) note[key] = value;
+    }
+    const accent = row.accent;
+    const emptyAccent = accent == null || (typeof accent === 'string' && !accent.trim());
+    if (!emptyAccent) {
+      if (typeof accent !== 'number' || !Number.isInteger(accent) || accent < 0 || accent > 99)
+        issues.push(`${prefix}：accent 必须是 0～99 的整数，0 表示平板型；未知时可留空。`);
+      else note.accent = accent;
+    }
+    if (note.reading && !/^[\u3041-\u3096\u3099\u309aー・\s]+$/u.test(note.reading)) {
+      issues.push(`${prefix}：reading 请使用平假名，可包含长音符号和间隔号。`);
     }
     notes.push(note);
   });
